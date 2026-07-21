@@ -1,0 +1,19 @@
+# Entorno virtual
+.venv/
+
+# Bytecode de Python
+__pycache__/
+*.py[cod]
+
+# Base de datos (datos generados en runtime)
+jobs.db
+jobs.db-wal
+jobs.db-shm
+
+# Logs
+*.log
+
+# Secretos / entorno (la API key va en el override de systemd, no en el repo)
+.env
+*.key
+apikey.conf

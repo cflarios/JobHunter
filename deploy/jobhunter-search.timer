@@ -1,0 +1,9 @@
+[Unit]
+Description=Ejecuta la busqueda de empleos todos los dias a las 12:00 (America/Bogota)
+
+[Timer]
+OnCalendar=*-*-* 12:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

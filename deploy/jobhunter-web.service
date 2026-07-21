@@ -1,0 +1,15 @@
+[Unit]
+Description=JobHunter web app (Flask)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/project/job-hunter
+ExecStart=/home/pi/project/job-hunter/.venv/bin/python /home/pi/project/job-hunter/app.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

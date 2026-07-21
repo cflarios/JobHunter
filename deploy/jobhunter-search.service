@@ -1,0 +1,10 @@
+[Unit]
+Description=JobHunter daily job search
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=pi
+WorkingDirectory=/home/pi/project/job-hunter
+ExecStart=/home/pi/project/job-hunter/run_search.sh
