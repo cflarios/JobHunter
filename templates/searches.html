@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Búsquedas · JobHunter{% endblock %}
+{% block body %}
+
+<div class="card">
+  <h3 style="margin-top:0">Añadir búsqueda</h3>
+  <p class="muted">Cada búsqueda activa se ejecuta a diario al mediodía. Empieza con DevOps, pero puedes añadir cualquier otro rol.</p>
+  <form method="post">
+    <input type="hidden" name="action" value="add">
+    <div class="row" style="margin-bottom:8px">
+      <input type="text" name="query" placeholder="Término de búsqueda, p. ej. Cloud Engineer" style="flex:1;min-width:220px" required>
+    </div>
+    <div class="row">
+      <input type="text" name="title_keywords" placeholder="Palabras que deben estar en el TÍTULO, separadas por coma (p. ej. cloud, platform)" style="flex:1;min-width:260px">
+      <input type="number" name="max_age_days" min="1" max="60" placeholder="días" title="Ventana de esta búsqueda" style="width:90px">
+      <button class="btn" type="submit">Añadir</button>
+    </div>
+    <p class="muted" style="margin:8px 0 0;font-size:13px">Las palabras clave del título filtran roles puros: sólo pasan ofertas cuyo <b>título</b> contenga alguna. Si lo dejas vacío, se exige que el título contenga todo el término de búsqueda. El campo <b>días</b> es la ventana propia de esta búsqueda (vacío = usar el valor global de abajo).</p>
+  </form>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0">Filtro de ubicación</h3>
+  <form method="post" class="row" style="align-items:flex-start">
+    <input type="hidden" name="action" value="set_location">
+    <select name="location_mode" style="min-width:320px">
+      <option value="worldwide" {{ 'selected' if location_mode=='worldwide' }}>
+        Mundial — sin bloqueo regional (recomendado)</option>
+      <option value="americas" {{ 'selected' if location_mode=='americas' }}>
+        Zona América — cualquier país del continente (incluye US-only)</option>
+      <option value="any" {{ 'selected' if location_mode=='any' }}>
+        Sin filtro — cualquier ubicación</option>
+    </select>
+    <button class="btn" type="submit">Guardar</button>
+  </form>
+  <p class="muted" style="margin:10px 0 0;font-size:13px">
+    <b>Mundial:</b> solo empleos abiertos a cualquier parte del mundo o que incluyan tu región (Anywhere, Worldwide, LATAM, Americas, Colombia). Descarta los bloqueados a un país/estado concreto (US-only, Virginia, Canadá, Europe, EMEA…). Ideal para contractor desde Colombia.
+  </p>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0">Ventana global por defecto</h3>
+  <p class="muted" style="margin:0 0 10px;font-size:13px">Se aplica a las búsquedas que no tengan una ventana propia definida arriba.</p>
+  <form class="row" method="post">
+    <input type="hidden" name="action" value="max_age">
+    <input type="number" name="max_age" value="{{ max_age }}" min="1" max="60" style="width:90px">
+    <span class="muted">días (por defecto 3)</span>
+    <button class="btn" type="submit">Guardar</button>
+  </form>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0">Mis búsquedas</h3>
+  {% for s in searches %}
+  <div style="border-top:1px solid var(--line);padding:14px 4px">
+    <div class="row" style="justify-content:space-between">
+      <div>
+        <span style="font-weight:600;font-size:16px">{{ s.query }}</span>
+        {% if s.active %}<span class="pill" style="color:var(--accent2)">Activa</span>
+        {% else %}<span class="pill">Pausada</span>{% endif %}
+        <span class="pill">{{ s.njobs }} empleos</span>
+      </div>
+      <div class="row">
+        <form method="post" action="{{ url_for('run_now') }}">
+          <input type="hidden" name="query" value="{{ s.query }}">
+          <button class="btn sm green" type="submit">▶ Buscar</button>
+        </form>
+        <form method="post">
+          <input type="hidden" name="action" value="toggle">
+          <input type="hidden" name="id" value="{{ s.id }}">
+          <button class="btn sm ghost" type="submit">{{ 'Pausar' if s.active else 'Activar' }}</button>
+        </form>
+        <form method="post" onsubmit="return confirm('¿Eliminar esta búsqueda y sus empleos?')">
+          <input type="hidden" name="action" value="delete">
+          <input type="hidden" name="id" value="{{ s.id }}">
+          <button class="btn sm danger" type="submit">Eliminar</button>
+        </form>
+      </div>
+    </div>
+    <form method="post" class="row" style="margin-top:8px">
+      <input type="hidden" name="action" value="edit_kw">
+      <input type="hidden" name="id" value="{{ s.id }}">
+      <span class="muted" style="font-size:13px">Título debe contener:</span>
+      <input type="text" name="title_keywords" value="{{ s.title_keywords or '' }}"
+             placeholder="(vacío = todo el término)" style="flex:1;min-width:180px">
+      <span class="muted" style="font-size:13px">Ventana:</span>
+      <input type="number" name="max_age_days" value="{{ s.max_age_days or '' }}"
+             min="1" max="60" placeholder="global" title="días" style="width:80px">
+      <span class="muted" style="font-size:13px">días</span>
+      <button class="btn sm" type="submit">Guardar</button>
+    </form>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

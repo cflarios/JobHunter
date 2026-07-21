@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Job Hunter{% endblock %}</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="alternate icon" href="/favicon.ico">
+<link rel="apple-touch-icon" href="/favicon.svg">
+<style>
+:root{
+  --bg:#0f1420; --card:#171e2e; --card2:#1e2739; --line:#2a3550;
+  --txt:#e6ecf5; --mut:#94a3c4; --accent:#4f8cff; --accent2:#22c55e;
+  --warn:#f59e0b; --pill:#243049;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  background:var(--bg);color:var(--txt);line-height:1.5}
+a{color:var(--accent);text-decoration:none}
+header{background:var(--card);border-bottom:1px solid var(--line);
+  position:sticky;top:0;z-index:10}
+.wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+nav{display:flex;align-items:center;gap:22px;height:60px}
+nav .brand{font-weight:700;font-size:18px;margin-right:auto}
+nav .brand span{color:var(--accent)}
+nav a{color:var(--mut);font-weight:500;position:relative}
+nav a.active,nav a:hover{color:var(--txt)}
+.badge{background:var(--accent2);color:#04210f;border-radius:10px;
+  font-size:11px;font-weight:700;padding:1px 7px;margin-left:5px}
+main{padding:26px 0 60px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;
+  padding:18px;margin-bottom:16px}
+.btn{background:var(--accent);color:#fff;border:none;border-radius:8px;
+  padding:9px 15px;font-weight:600;cursor:pointer;font-size:14px}
+.btn.green{background:var(--accent2);color:#04210f}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--txt)}
+.btn.sm{padding:5px 10px;font-size:12px}
+.btn.danger{background:#3a2130;color:#ff9db0;border:1px solid #5a2b3d}
+input,select{background:var(--card2);border:1px solid var(--line);color:var(--txt);
+  border-radius:8px;padding:9px 11px;font-size:14px}
+input::placeholder{color:var(--mut)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.flash{background:#13351f;border:1px solid #1f6b3a;color:#9defb9;
+  padding:10px 14px;border-radius:8px;margin-bottom:14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.stat{background:var(--card2);border-radius:10px;padding:14px}
+.stat .n{font-size:24px;font-weight:700}
+.stat .l{color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.5px}
+.pill{background:var(--pill);color:var(--mut);border-radius:20px;
+  padding:3px 10px;font-size:12px;display:inline-block}
+.muted{color:var(--mut)}
+table{width:100%;border-collapse:collapse}
+.spinner{display:inline-block;width:12px;height:12px;border:2px solid rgba(0,0,0,.25);
+  border-top-color:currentColor;border-radius:50%;animation:spin .7s linear infinite;
+  vertical-align:-2px;margin-right:5px}
+@keyframes spin{to{transform:rotate(360deg)}}
+button[disabled]{opacity:.75;cursor:progress}
+</style>
+</head>
+<body>
+<header><div class="wrap"><nav>
+  <div class="brand">Job<span>Hunter</span></div>
+  <a href="{{ url_for('index') }}" class="{{ 'active' if request.endpoint=='index' }}">Empleos</a>
+  <a href="{{ url_for('companies') }}" class="{{ 'active' if request.endpoint=='companies' }}">Compañías</a>
+  <a href="{{ url_for('searches') }}" class="{{ 'active' if request.endpoint=='searches' }}">Búsquedas</a>
+  <a href="{{ url_for('notifications') }}" class="{{ 'active' if request.endpoint=='notifications' }}">
+    Notificaciones<span id="notif-badge" class="badge" style="display:none"></span></a>
+</nav></div></header>
+<main><div class="wrap">
+  {% with msgs = get_flashed_messages() %}
+    {% for m in msgs %}<div class="flash">{{ m }}</div>{% endfor %}
+  {% endwith %}
+  {% block body %}{% endblock %}
+</div></main>
+<script>
+async function poll(){
+  try{const r=await fetch("{{ url_for('api_unread') }}");const d=await r.json();
+    const b=document.getElementById('notif-badge');
+    if(d.unread>0){b.textContent=d.unread;b.style.display='inline-block';}
+    else{b.style.display='none';}
+  }catch(e){}
+}
+poll();setInterval(poll,30000);
+</script>
+</body>
+</html>
