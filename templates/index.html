@@ -2,6 +2,15 @@
 {% block title %}Empleos · JobHunter{% endblock %}
 {% block body %}
 
+<a id="new-banner" href="javascript:location.reload()"
+   style="display:none;text-decoration:none;margin-bottom:16px;padding:12px 16px;
+   background:#13351f;border:1px solid var(--accent2);border-radius:10px;
+   color:#9defb9;font-weight:600;align-items:center;gap:8px">
+  <span class="spinner" style="border-color:rgba(157,239,185,.35);border-top-color:#9defb9"></span>
+  <span id="new-banner-text">Hay empleos nuevos</span>
+  <span style="margin-left:auto;color:var(--accent2)">↻ Actualizar</span>
+</a>
+
 <div class="grid" style="margin-bottom:18px">
   <div class="stat"><div class="n">{{ stats.total }}</div><div class="l">Total guardados</div></div>
   <div class="stat"><div class="n" style="color:var(--accent2)">{{ stats.new }}</div><div class="l">Nuevos sin ver</div></div>
@@ -72,4 +81,29 @@
 {% else %}
 <div class="card muted">No hay empleos que coincidan. Ejecuta una búsqueda o ajusta los filtros.</div>
 {% endfor %}
+
+<script>
+// Aviso cuando aparecen empleos nuevos (corrida diaria o "Buscar ahora")
+// sin recargar la página. Los filtros se conservan porque van en la URL.
+(function(){
+  var base = null;
+  var banner = document.getElementById('new-banner');
+  var txt = document.getElementById('new-banner-text');
+  async function check(){
+    try{
+      var d = await (await fetch("{{ url_for('api_jobs_status') }}")).json();
+      if(base === null){ base = d; return; }          // línea base al cargar
+      if(d.latest > base.latest){                       // hay filas nuevas
+        var n = d.total - base.total;
+        txt.textContent = n > 0
+          ? ('Hay ' + n + ' empleo' + (n === 1 ? '' : 's') + ' nuevo' + (n === 1 ? '' : 's'))
+          : 'Hay empleos nuevos';
+        banner.style.display = 'flex';
+      }
+    }catch(e){}
+  }
+  check();
+  setInterval(check, 45000);   // revisa cada 45 s
+})();
+</script>
 {% endblock %}

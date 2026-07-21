@@ -296,6 +296,15 @@ def api_unread():
     return jsonify(unread=c)
 
 
+@app.route("/api/jobs-status")
+def api_jobs_status():
+    con = get_db()
+    row = con.execute(
+        "SELECT COUNT(*) c, COALESCE(MAX(id),0) m FROM jobs").fetchone()
+    con.close()
+    return jsonify(total=row["c"], latest=row["m"])
+
+
 if __name__ == "__main__":
     init_db()
     app.run(host="0.0.0.0", port=8080, debug=False)
