@@ -66,6 +66,7 @@ button[disabled]{opacity:.75;cursor:progress}
   <a href="{{ url_for('notifications') }}" class="{{ 'active' if request.endpoint=='notifications' }}">
     Notificaciones<span id="notif-badge" class="badge" style="display:none"></span></a>
   <a href="{{ url_for('architecture_page') }}">Arquitectura</a>
+  <a href="{{ url_for('workflow_page') }}">Flujo</a>
 </nav></div></header>
 <main><div class="wrap">
   {% with msgs = get_flashed_messages() %}

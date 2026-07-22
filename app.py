@@ -315,6 +315,14 @@ def architecture_json_file():
     return send_file(path, mimetype="application/json")
 
 
+@app.route("/workflow")
+def workflow_page():
+    path = os.path.join(BASE_DIR, "workflow.html")
+    if not os.path.exists(path):
+        return "workflow.html no encontrado", 404
+    return send_file(path)
+
+
 @app.route("/api/jobs-status")
 def api_jobs_status():
     con = get_db()
