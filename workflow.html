@@ -130,6 +130,7 @@
     {id:'muse',    c:2, k:'blue',  t:'The Muse',      s:'API'},
     {id:'nomads',  c:2, k:'blue',  t:'Working Nomads',s:'API'},
     {id:'landing', c:2, k:'blue',  t:'Landing.jobs',  s:'API · salario'},
+    {id:'getonbrd',c:2, k:'blue',  t:'Get on Board',  s:'API · LATAM'},
     {id:'f_title', c:3, k:'green', t:'title_ok()',    s:'rol en el título',  tag:'filtro'},
     {id:'f_loc',   c:3, k:'green', t:'location_ok()', s:'zona · no geo-lock'},
     {id:'f_win',   c:3, k:'green', t:'ventana',       s:'≤ N días'},
@@ -145,12 +146,16 @@
     {id:'r_sum',   c:5, k:'violet',t:'/companies/summary',s:'POST · AJAX'},
     {id:'api_un',  c:5, k:'violet',t:'/api/unread',   s:'badge 30s'},
     {id:'api_js',  c:5, k:'violet',t:'/api/jobs-status',s:'barra 45s'},
-    {id:'reviews', c:6, k:'amber', t:'reviews.py',    s:'resumen', tag:'ia'},
-    {id:'gemini',  c:6, k:'amber', t:'Gemini 2.5',    s:'grounding web'},
+    {id:'reviews', c:6, k:'amber', t:'reviews.py',    s:'resumen empresas', tag:'ia'},
+    {id:'cv_py',   c:6, k:'amber', t:'cv.py',         s:'CV + IA'},
+    {id:'gemini',  c:6, k:'amber', t:'Gemini 2.5',    s:'grounding · JSON'},
+    {id:'r_cv',    c:5, k:'violet',t:'Mi CV',         s:'/cv'},
+    {id:'t_prof',  c:4, k:'green', t:'profile',       s:'CV · perfil'},
+    {id:'t_match', c:4, k:'green', t:'job_matches',   s:'afinidad'},
     {id:'browser', c:7, k:'violet',t:'Navegador',     s:'LAN · usuario', tag:'cliente'}
   ];
   // ---- Aristas: kind = normal|config|poll|ext|ret ----
-  var SRC = ['remotive','remoteok','jobicy','himalaya','wwr','arbeit','muse','nomads','landing'];
+  var SRC = ['remotive','remoteok','jobicy','himalaya','wwr','arbeit','muse','nomads','landing','getonbrd'];
   var EDGES = [
     ['timer','run_sh'],['run_sh','run_all'],['user','run_all'],['run_all','run_srch']
   ];
@@ -166,7 +171,14 @@
     ['api_un','browser','poll'],['api_js','browser','poll'],
     ['browser','r_sum','ext'],
     ['r_sum','reviews','ext'],['reviews','gemini','ext'],['gemini','reviews','ret'],
-    ['reviews','t_rev'],['t_rev','r_comp','config']
+    ['reviews','t_rev'],['t_rev','r_comp','config'],
+    // --- CV + IA ---
+    ['flask','r_cv'],['r_cv','browser'],
+    ['r_cv','cv_py','ext'],['browser','cv_py','ext'],
+    ['cv_py','gemini','ext'],['gemini','cv_py','ret'],
+    ['cv_py','t_prof'],['cv_py','t_match'],
+    ['t_prof','cv_py','config'],['t_jobs','cv_py','config'],
+    ['t_match','r_index','config']
   );
 
   // ---- Layout por columnas ----
