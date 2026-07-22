@@ -1,7 +1,10 @@
+import os
 import datetime as dt
 from urllib.parse import quote_plus
 from flask import (Flask, render_template, request, redirect, url_for,
-                   jsonify, flash, Response)
+                   jsonify, flash, Response, send_file)
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 from db import get_db, init_db, get_setting, set_setting
 from fetcher import run_all
@@ -294,6 +297,22 @@ def api_unread():
     c = con.execute("SELECT COUNT(*) c FROM notifications WHERE read=0").fetchone()["c"]
     con.close()
     return jsonify(unread=c)
+
+
+@app.route("/architecture")
+def architecture_page():
+    path = os.path.join(BASE_DIR, "architecture.html")
+    if not os.path.exists(path):
+        return "architecture.html no encontrado", 404
+    return send_file(path)
+
+
+@app.route("/architecture.json")
+def architecture_json_file():
+    path = os.path.join(BASE_DIR, "architecture.json")
+    if not os.path.exists(path):
+        return jsonify(error="not found"), 404
+    return send_file(path, mimetype="application/json")
 
 
 @app.route("/api/jobs-status")

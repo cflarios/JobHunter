@@ -1,0 +1,529 @@
+<!doctype html>
+<html lang="es" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JobHunter · Arquitectura</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%230d1220'/><circle cx='32' cy='32' r='10' fill='none' stroke='%235a90ff' stroke-width='6'/><circle cx='48' cy='17' r='6' fill='%2334d399'/></svg>">
+<style>html,body{margin:0;background:#0d1220}</style>
+</head>
+<body>
+<style>
+:root{
+  --ground:#0d1220; --surface:#151d2f; --surface2:#1b2540; --line:#2a3554;
+  --line-strong:#40507a;
+  --text:#e7edf7; --muted:#94a4c6; --faint:#657299;
+  --blue:#5a90ff; --green:#34d399; --violet:#a78bfa; --amber:#f5b34a; --slate:#8595bd;
+  --blue-bg:rgba(90,144,255,.12); --green-bg:rgba(52,211,153,.12);
+  --violet-bg:rgba(167,139,250,.13); --amber-bg:rgba(245,179,74,.13);
+  --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --radius:14px; --shadow:0 1px 0 rgba(255,255,255,.03) inset, 0 12px 30px -18px rgba(0,0,0,.7);
+}
+:root[data-theme="light"], :root:not([data-theme="dark"]) { }
+@media (prefers-color-scheme: light){
+  :root{
+    --ground:#f5f6fb; --surface:#ffffff; --surface2:#eef1f9; --line:#dbe0ee;
+    --line-strong:#c3cbe0; --text:#141a2b; --muted:#54607e; --faint:#8b96b3;
+    --blue:#2f6bff; --green:#0f9d6b; --violet:#7c53e6; --amber:#c17a12; --slate:#5a6a8c;
+    --blue-bg:rgba(47,107,255,.10); --green-bg:rgba(15,157,107,.10);
+    --violet-bg:rgba(124,83,230,.10); --amber-bg:rgba(193,122,18,.12);
+    --shadow:0 1px 0 rgba(255,255,255,.6) inset, 0 14px 34px -22px rgba(20,26,43,.4);
+  }
+}
+:root[data-theme="light"]{
+  --ground:#f5f6fb; --surface:#ffffff; --surface2:#eef1f9; --line:#dbe0ee;
+  --line-strong:#c3cbe0; --text:#141a2b; --muted:#54607e; --faint:#8b96b3;
+  --blue:#2f6bff; --green:#0f9d6b; --violet:#7c53e6; --amber:#c17a12;
+  --blue-bg:rgba(47,107,255,.10); --green-bg:rgba(15,157,107,.10);
+  --violet-bg:rgba(124,83,230,.10); --amber-bg:rgba(193,122,18,.12);
+  --shadow:0 1px 0 rgba(255,255,255,.6) inset, 0 14px 34px -22px rgba(20,26,43,.4);
+}
+:root[data-theme="dark"]{
+  --ground:#0d1220; --surface:#151d2f; --surface2:#1b2540; --line:#2a3554;
+  --line-strong:#40507a; --text:#e7edf7; --muted:#94a4c6; --faint:#657299;
+  --blue:#5a90ff; --green:#34d399; --violet:#a78bfa; --amber:#f5b34a;
+  --blue-bg:rgba(90,144,255,.12); --green-bg:rgba(52,211,153,.12);
+  --violet-bg:rgba(167,139,250,.13); --amber-bg:rgba(245,179,74,.13);
+}
+*{box-sizing:border-box}
+.jh{background:var(--ground);color:var(--text);font-family:var(--sans);
+  line-height:1.55;-webkit-font-smoothing:antialiased;padding:0 20px 80px}
+.jh .wrap{max-width:1080px;margin:0 auto}
+.mono{font-family:var(--mono)}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--faint)}
+a.jhlink{color:var(--blue)}
+
+/* Header */
+.jh header{padding:56px 0 30px;border-bottom:1px solid var(--line)}
+.jh h1{font-size:clamp(30px,5vw,46px);margin:12px 0 8px;letter-spacing:-.02em;
+  font-weight:800;text-wrap:balance}
+.jh h1 .dot{color:var(--blue)}
+.jh .thesis{color:var(--muted);max-width:62ch;font-size:16px;margin:0}
+.chips{display:flex;flex-wrap:wrap;gap:10px;margin-top:26px}
+.chip{background:var(--surface);border:1px solid var(--line);border-radius:12px;
+  padding:10px 14px;box-shadow:var(--shadow)}
+.chip .n{font-family:var(--mono);font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;
+  color:var(--text);line-height:1}
+.chip .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:5px}
+
+/* Section shells */
+section.blk{padding:44px 0 6px}
+h2.sec{font-size:13px;font-family:var(--mono);letter-spacing:.14em;text-transform:uppercase;
+  color:var(--faint);margin:0 0 20px;display:flex;align-items:center;gap:12px}
+h2.sec::after{content:"";flex:1;height:1px;background:var(--line)}
+
+/* Flow pipeline */
+.flow{position:relative;padding-left:40px}
+.flow::before{content:"";position:absolute;left:15px;top:8px;bottom:24px;width:2px;
+  background:linear-gradient(var(--blue),var(--green) 45%,var(--violet) 78%,var(--line))}
+.stage{position:relative;margin-bottom:16px}
+.stage .num{position:absolute;left:-40px;top:2px;width:32px;height:32px;border-radius:50%;
+  background:var(--surface);border:2px solid var(--accent,var(--line-strong));color:var(--accent,var(--text));
+  font-family:var(--mono);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;
+  box-shadow:var(--shadow)}
+.stage-card{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--accent,var(--line-strong));
+  border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow)}
+.stage-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.stage-title{font-weight:700;font-size:16px}
+.stage-tag{font-family:var(--mono);font-size:11px;color:var(--accent,var(--muted));
+  background:var(--accent-bg,var(--surface2));padding:3px 9px;border-radius:20px}
+.nodes{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.node{font-family:var(--mono);font-size:12.5px;background:var(--surface2);border:1px solid var(--line);
+  border-radius:9px;padding:7px 11px;color:var(--text)}
+.node b{color:var(--accent,var(--text));font-weight:600}
+.node .d{color:var(--muted);font-family:var(--sans);font-size:11.5px;display:block;margin-top:2px;max-width:34ch}
+.stage[data-c=blue]{--accent:var(--blue);--accent-bg:var(--blue-bg)}
+.stage[data-c=green]{--accent:var(--green);--accent-bg:var(--green-bg)}
+.stage[data-c=violet]{--accent:var(--violet);--accent-bg:var(--violet-bg)}
+.stage[data-c=amber]{--accent:var(--amber);--accent-bg:var(--amber-bg)}
+
+/* branch */
+.branch{margin:8px 0 20px;padding-left:40px;position:relative}
+.branch .stage-card{border-style:dashed}
+
+/* generic grid cards */
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+  padding:16px 18px;box-shadow:var(--shadow)}
+.card h3{margin:0 0 8px;font-size:15px}
+.card p{margin:0;color:var(--muted);font-size:13.5px}
+.card .k{font-family:var(--mono);font-size:12px;color:var(--green)}
+
+/* tables */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface)}
+table{width:100%;border-collapse:collapse;font-size:13.5px;min-width:520px}
+th,td{text-align:left;padding:11px 16px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--faint);
+  background:var(--surface2)}
+tr:last-child td{border-bottom:none}
+td.mono,.path{font-family:var(--mono);color:var(--blue)}
+.method{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.cols{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.cols b{color:var(--text);font-weight:600}
+.pk{color:var(--amber)}.fk{color:var(--violet)}
+
+/* sources grid */
+.srcs{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+.src{background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:12px 14px}
+.src .name{font-weight:700;font-size:14px}
+.src .type{font-family:var(--mono);font-size:11px;color:var(--blue);margin-top:1px}
+.src .desc{color:var(--muted);font-size:12px;margin-top:5px}
+
+/* lists */
+.list{list-style:none;padding:0;margin:0;display:grid;gap:8px}
+.list li{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:11px 14px;
+  font-size:13.5px;color:var(--muted);border-left:3px solid var(--slate)}
+.list li b{color:var(--text)}
+.list.sec-list li{border-left-color:var(--green)}
+
+/* footer / json */
+.jh footer{margin-top:52px;padding-top:22px;border-top:1px solid var(--line);color:var(--faint);
+  font-size:12.5px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+details.json{margin-top:26px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius)}
+details.json summary{cursor:pointer;padding:14px 18px;font-family:var(--mono);font-size:12px;color:var(--muted)}
+details.json[open] summary{border-bottom:1px solid var(--line)}
+details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mono);font-size:11.5px;
+  line-height:1.5;color:var(--text)}
+
+.legend{display:flex;flex-wrap:wrap;gap:14px;margin:-4px 0 22px;font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:11px;height:11px;border-radius:3px;display:inline-block}
+
+@media (prefers-reduced-motion:no-preference){
+  .stage,.card,.chip{animation:rise .5s cubic-bezier(.2,.7,.3,1) both}
+  .stage:nth-child(2){animation-delay:.04s}.stage:nth-child(3){animation-delay:.08s}
+  .stage:nth-child(4){animation-delay:.12s}.stage:nth-child(5){animation-delay:.16s}
+  @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+}
+</style>
+
+<div class="jh"><div class="wrap">
+
+  <header>
+    <div class="eyebrow">Mapa de arquitectura · auto-alojado en Raspberry Pi</div>
+    <h1>Job<span class="dot">Hunter</span></h1>
+    <p class="thesis">Buscador personal de empleos remotos. Cada mediodía barre 9 bolsas de trabajo,
+    filtra por rol, zona y frescura, guarda lo nuevo y te avisa — con resúmenes de reputación de cada
+    empresa vía Gemini. Enfocado en DevOps/SRE remoto desde Colombia, ampliable a cualquier rol.</p>
+    <div class="chips">
+      <div class="chip"><div class="n">9</div><div class="l">Fuentes</div></div>
+      <div class="chip"><div class="n">5</div><div class="l">Tablas SQLite</div></div>
+      <div class="chip"><div class="n">13</div><div class="l">Rutas HTTP</div></div>
+      <div class="chip"><div class="n">~1.5k</div><div class="l">Líneas de código</div></div>
+      <div class="chip"><div class="n">3</div><div class="l">Unidades systemd</div></div>
+      <div class="chip"><div class="n">1</div><div class="l">Integración IA</div></div>
+    </div>
+  </header>
+
+  <section class="blk">
+    <h2 class="sec">Flujo de datos — del cron al navegador</h2>
+    <div class="legend">
+      <span><i style="background:var(--blue)"></i>Ingesta</span>
+      <span><i style="background:var(--green)"></i>Datos</span>
+      <span><i style="background:var(--violet)"></i>Web / Cliente</span>
+      <span><i style="background:var(--amber)"></i>Externo</span>
+    </div>
+
+    <div class="flow">
+      <div class="stage" data-c="blue">
+        <div class="num">01</div>
+        <div class="stage-card">
+          <div class="stage-head"><span class="stage-title">Disparo</span><span class="stage-tag">timer · usuario</span></div>
+          <div class="nodes">
+            <div class="node"><b>jobhunter-search.timer</b><span class="d">systemd · 12:00 America/Bogota · Persistent (recupera si estuvo apagada)</span></div>
+            <div class="node"><b>Usuario · Buscar ahora</b><span class="d">POST /run manual desde la UI</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="stage" data-c="blue">
+        <div class="num">02</div>
+        <div class="stage-card">
+          <div class="stage-head"><span class="stage-title">Ingesta / Orquestación</span><span class="stage-tag">fetcher.py</span></div>
+          <div class="nodes">
+            <div class="node"><b>run_search.sh</b><span class="d">wrapper del cron → search.log</span></div>
+            <div class="node"><b>run_all()</b><span class="d">recorre búsquedas activas; ventana y modo por búsqueda</span></div>
+            <div class="node"><b>run_search()</b><span class="d">consulta fuentes, filtra, deduplica, inserta, notifica</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="stage" data-c="blue">
+        <div class="num">03</div>
+        <div class="stage-card">
+          <div class="stage-head"><span class="stage-title">9 Fuentes</span><span class="stage-tag">API / RSS · sin key</span></div>
+          <div class="nodes">
+            <div class="node"><b>Remotive</b></div><div class="node"><b>RemoteOK</b></div>
+            <div class="node"><b>Jobicy</b></div><div class="node"><b>Himalayas</b></div>
+            <div class="node"><b>WeWorkRemotely</b></div><div class="node"><b>Arbeitnow</b></div>
+            <div class="node"><b>The Muse</b></div><div class="node"><b>Working Nomads</b></div>
+            <div class="node"><b>Landing.jobs</b><span class="d">incluye salario</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="stage" data-c="green">
+        <div class="num">04</div>
+        <div class="stage-card">
+          <div class="stage-head"><span class="stage-title">Pipeline de filtros</span><span class="stage-tag">uniforme a todas</span></div>
+          <div class="nodes">
+            <div class="node"><b>title_ok()</b><span class="d">el título debe contener el rol (devops, sre, site reliability…)</span></div>
+            <div class="node"><b>location_ok()</b><span class="d">modo mundial / América / sin filtro — descarta locks a país/estado</span></div>
+            <div class="node"><b>ventana de días</b><span class="d">posted_ts ≤ max_age_days (por búsqueda o global)</span></div>
+            <div class="node"><b>dedup</b><span class="d">INSERT OR IGNORE por URL única</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="stage" data-c="green">
+        <div class="num">05</div>
+        <div class="stage-card">
+          <div class="stage-head"><span class="stage-title">Almacenamiento</span><span class="stage-tag">SQLite · WAL</span></div>
+          <div class="nodes">
+            <div class="node"><b>jobs.db</b><span class="d">db.py · searches · jobs · notifications · settings · company_reviews</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="stage" data-c="violet">
+        <div class="num">06</div>
+        <div class="stage-card">
+          <div class="stage-head"><span class="stage-title">Capa web</span><span class="stage-tag">Flask · app.py</span></div>
+          <div class="nodes">
+            <div class="node"><b>13 rutas</b><span class="d">empleos, búsquedas, compañías, notificaciones, APIs</span></div>
+            <div class="node"><b>templates/</b><span class="d">Jinja2 · filtro Markdown seguro · favicon SVG</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="stage" data-c="violet">
+        <div class="num">07</div>
+        <div class="stage-card">
+          <div class="stage-head"><span class="stage-title">Cliente</span><span class="stage-tag">navegador · LAN</span></div>
+          <div class="nodes">
+            <div class="node"><b>Empleos</b><span class="d">lista + filtros + barra "empleos nuevos" (sondeo 45s)</span></div>
+            <div class="node"><b>Compañías</b><span class="d">empleadores + Glassdoor + resumen AJAX</span></div>
+            <div class="node"><b>Notificaciones</b><span class="d">badge sondea /api/unread cada 30s</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="branch">
+      <div class="stage" data-c="amber" style="margin-bottom:0">
+        <div class="num">↳</div>
+        <div class="stage-card">
+          <div class="stage-head"><span class="stage-title">Rama · Resumen de opiniones</span><span class="stage-tag">externo · bajo demanda</span></div>
+          <div class="nodes">
+            <div class="node"><b>POST /companies/summary</b><span class="d">botón AJAX con spinner</span></div>
+            <div class="node"><b>reviews.py → Gemini 2.5 Flash</b><span class="d">grounding con Google Search · thinkingBudget=0 (evita truncar)</span></div>
+            <div class="node"><b>company_reviews</b><span class="d">cachea el resumen + nombre canónico para Glassdoor</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="blk">
+    <h2 class="sec">Esquema de datos — jobs.db</h2>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Tabla</th><th>Columnas</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">searches</td><td class="cols"><b>id</b>, query, title_keywords, max_age_days, active, created_at</td></tr>
+        <tr><td class="mono">jobs</td><td class="cols"><b>id</b>, <span class="fk">search_id→searches</span>, title, company, <span class="pk">url ·unique</span>, source, salary, location, date_posted, posted_ts, found_at, is_new</td></tr>
+        <tr><td class="mono">notifications</td><td class="cols"><b>id</b>, message, created_at, read</td></tr>
+        <tr><td class="mono">settings</td><td class="cols"><b>key</b>, value <span style="color:var(--faint)">· location_mode, max_age_days…</span></td></tr>
+        <tr><td class="mono">company_reviews</td><td class="cols"><b>company</b>, summary, resolved_name, status, generated_at</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section class="blk">
+    <h2 class="sec">Rutas HTTP — app.py</h2>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Ruta</th><th>Método</th><th>Propósito</th></tr></thead>
+      <tbody>
+        <tr><td class="path">/</td><td class="method">GET</td><td>Empleos: lista + filtros (texto, fuente, búsqueda, días)</td></tr>
+        <tr><td class="path">/mark-seen</td><td class="method">POST</td><td>Marca todos los empleos como vistos</td></tr>
+        <tr><td class="path">/notifications</td><td class="method">GET</td><td>Historial (marca leídas)</td></tr>
+        <tr><td class="path">/notifications/clear</td><td class="method">POST</td><td>Borra notificaciones</td></tr>
+        <tr><td class="path">/searches</td><td class="method">GET·POST</td><td>Búsquedas: alta, keywords de título, modo ubicación, ventana</td></tr>
+        <tr><td class="path">/run</td><td class="method">POST</td><td>Buscar ahora (todas las activas o una)</td></tr>
+        <tr><td class="path">/companies</td><td class="method">GET</td><td>Empleadores reales agregados del campo company</td></tr>
+        <tr><td class="path">/companies/summary</td><td class="method">POST</td><td>Genera/cachea resumen de opiniones (JSON si AJAX)</td></tr>
+        <tr><td class="path">/companies/glassdoor-name</td><td class="method">POST</td><td>Override manual del nombre para Glassdoor</td></tr>
+        <tr><td class="path">/favicon.svg · .ico</td><td class="method">GET</td><td>Favicon SVG servido por Flask</td></tr>
+        <tr><td class="path">/api/unread</td><td class="method">GET</td><td>Nº de notificaciones sin leer (polling badge)</td></tr>
+        <tr><td class="path">/api/jobs-status</td><td class="method">GET</td><td>total + último id de jobs (barra de empleos nuevos)</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section class="blk">
+    <h2 class="sec">Fuentes de empleo</h2>
+    <div class="srcs">
+      <div class="src"><div class="name">Remotive</div><div class="type">API JSON</div><div class="desc">search = término</div></div>
+      <div class="src"><div class="name">RemoteOK</div><div class="type">API JSON</div><div class="desc">feed completo, filtro local</div></div>
+      <div class="src"><div class="name">Jobicy</div><div class="type">API JSON</div><div class="desc">tag = término</div></div>
+      <div class="src"><div class="name">Himalayas</div><div class="type">API JSON</div><div class="desc">feed de remotos</div></div>
+      <div class="src"><div class="name">WeWorkRemotely</div><div class="type">RSS ×2</div><div class="desc">DevOps/Sysadmin + Programming</div></div>
+      <div class="src"><div class="name">Arbeitnow</div><div class="type">API JSON</div><div class="desc">solo empleos remotos</div></div>
+      <div class="src"><div class="name">The Muse</div><div class="type">API JSON</div><div class="desc">location = Flexible/Remote</div></div>
+      <div class="src"><div class="name">Working Nomads</div><div class="type">API JSON</div><div class="desc">todas las categorías</div></div>
+      <div class="src"><div class="name">Landing.jobs</div><div class="type">API JSON</div><div class="desc">incluye rango salarial</div></div>
+    </div>
+  </section>
+
+  <section class="blk">
+    <h2 class="sec">Despliegue — systemd</h2>
+    <div class="cards">
+      <div class="card"><h3>jobhunter-web.service</h3><p><span class="k">.venv/bin/python app.py</span> · puerto 8080 · Restart=on-failure · arranca en el boot</p></div>
+      <div class="card"><h3>jobhunter-search.service</h3><p><span class="k">run_search.sh</span> · Type=oneshot · lanzado por el timer</p></div>
+      <div class="card"><h3>jobhunter-search.timer</h3><p><span class="k">OnCalendar 12:00</span> · America/Bogota · Persistent=true (catch-up)</p></div>
+    </div>
+  </section>
+
+  <section class="blk">
+    <h2 class="sec">Seguridad y datos</h2>
+    <ul class="list sec-list">
+      <li><b>Sin secretos en el repo.</b> GEMINI_API_KEY vive en un override de systemd propiedad de root (600), no en el código.</li>
+      <li><b>.gitignore</b> excluye <span class="mono">.venv/</span>, <span class="mono">jobs.db*</span>, <span class="mono">*.log</span> y <span class="mono">apikey.conf</span>.</li>
+      <li><b>Render seguro.</b> Los resúmenes de Gemini pasan por un filtro Markdown que escapa HTML antes de mostrarse.</li>
+      <li><b>Solo lectura pública.</b> La app corre en la LAN; el timer recupera corridas perdidas con Persistent=true.</li>
+    </ul>
+  </section>
+
+  <details class="json">
+    <summary>▾ architecture.json — modelo legible por máquina (gemelo de esta página)</summary>
+    <pre id="jsonPre">cargando…</pre>
+  </details>
+
+  <footer>
+    <span>JobHunter · mapa de arquitectura generado el 2026-07-20</span>
+    <span class="mono">Python · Flask · SQLite · systemd · Gemini</span>
+  </footer>
+
+</div></div>
+
+<script id="archData" type="application/json">{
+  "project": "JobHunter",
+  "description": "Buscador personal de empleos remotos auto-alojado en una Raspberry Pi. Enfocado en DevOps/SRE remoto (contractor desde Colombia), ampliable a cualquier rol.",
+  "generated": "2026-07-20",
+  "host": "Raspberry Pi (Debian 13, Python 3.13) — http://192.168.1.11:8080",
+  "stack": ["Python 3.13", "Flask", "SQLite (WAL)", "systemd", "Gemini API"],
+  "metrics": {
+    "sources": 9,
+    "db_tables": 5,
+    "http_routes": 13,
+    "python_lines": 1140,
+    "template_lines": 399,
+    "systemd_units": 3
+  },
+  "layers": [
+    {
+      "id": "triggers",
+      "name": "Disparadores",
+      "color": "blue",
+      "components": [
+        { "name": "jobhunter-search.timer", "detail": "systemd timer, OnCalendar=*-*-* 12:00:00 (America/Bogota), Persistent=true" },
+        { "name": "Usuario · Buscar ahora", "detail": "POST /run desde la UI, manual" }
+      ]
+    },
+    {
+      "id": "ingest",
+      "name": "Ingesta / Orquestación",
+      "color": "blue",
+      "components": [
+        { "name": "run_search.sh", "detail": "wrapper del cron; registra en search.log" },
+        { "name": "fetcher.run_all()", "detail": "recorre búsquedas activas y aplica ventana/modo por búsqueda" },
+        { "name": "fetcher.run_search()", "detail": "consulta las 9 fuentes, filtra, deduplica, inserta y notifica" }
+      ]
+    },
+    {
+      "id": "sources",
+      "name": "Fuentes (API / RSS público, sin key)",
+      "color": "blue",
+      "components": [
+        { "name": "Remotive", "detail": "API JSON, search=query" },
+        { "name": "RemoteOK", "detail": "API JSON, feed completo" },
+        { "name": "Jobicy", "detail": "API JSON, tag=query" },
+        { "name": "Himalayas", "detail": "API JSON" },
+        { "name": "WeWorkRemotely", "detail": "RSS: DevOps/Sysadmin + Programming" },
+        { "name": "Arbeitnow", "detail": "API JSON (solo remotos)" },
+        { "name": "The Muse", "detail": "API JSON, location=Flexible/Remote" },
+        { "name": "Working Nomads", "detail": "API JSON" },
+        { "name": "Landing.jobs", "detail": "API JSON (incluye salario)" }
+      ]
+    },
+    {
+      "id": "filters",
+      "name": "Pipeline de filtros (uniforme a todas las fuentes)",
+      "color": "green",
+      "components": [
+        { "name": "title_ok()", "detail": "el TÍTULO debe contener alguna palabra clave del rol (p. ej. devops, sre, site reliability)" },
+        { "name": "location_ok()", "detail": "modo worldwide (por defecto) / americas / any; descarta locks a país/estado que excluyen a Colombia" },
+        { "name": "ventana de días", "detail": "posted_ts dentro de max_age_days (por búsqueda o global)" },
+        { "name": "dedup", "detail": "INSERT OR IGNORE por URL única" }
+      ]
+    },
+    {
+      "id": "store",
+      "name": "Almacenamiento",
+      "color": "green",
+      "components": [
+        { "name": "SQLite jobs.db (WAL)", "detail": "db.py; 5 tablas" }
+      ]
+    },
+    {
+      "id": "web",
+      "name": "Capa web (Flask)",
+      "color": "violet",
+      "components": [
+        { "name": "app.py", "detail": "13 rutas + filtro Markdown seguro + favicon SVG" },
+        { "name": "templates/", "detail": "Jinja2: base, index, searches, notifications, companies, _review" }
+      ]
+    },
+    {
+      "id": "client",
+      "name": "Cliente (navegador)",
+      "color": "violet",
+      "components": [
+        { "name": "Empleos", "detail": "lista + filtros + barra de 'empleos nuevos' (sondeo 45s)" },
+        { "name": "Compañías", "detail": "empleadores reales + Glassdoor + resumen AJAX con spinner" },
+        { "name": "Notificaciones", "detail": "badge que sondea /api/unread cada 30s" }
+      ]
+    },
+    {
+      "id": "external",
+      "name": "Integración externa",
+      "color": "amber",
+      "components": [
+        { "name": "reviews.py → Gemini 2.5 Flash", "detail": "grounding con Google Search; thinkingBudget=0 para no truncar; resume reputación (Glassdoor)" },
+        { "name": "GEMINI_API_KEY", "detail": "override de systemd (root, 600), fuera del repo" }
+      ]
+    }
+  ],
+  "data_flow": [
+    "Timer 12:00 (o Usuario) → run_search.sh → fetcher.run_all()",
+    "run_search() → 9 fuentes (HTTP) → filtros (título, ubicación, fecha, dedup)",
+    "→ INSERT OR IGNORE en jobs + INSERT notificación si hay nuevos",
+    "Flask lee jobs.db → renderiza Empleos/Compañías/Notificaciones",
+    "Navegador sondea /api/jobs-status (45s) y /api/unread (30s) para avisar sin recargar",
+    "Compañías: botón → POST /companies/summary → reviews.py → Gemini (grounding) → cachea en company_reviews → HTML del resumen (AJAX)"
+  ],
+  "db_schema": {
+    "searches": ["id", "query", "title_keywords", "max_age_days", "active", "created_at"],
+    "jobs": ["id", "search_id→searches", "title", "company", "url (unique)", "source", "salary", "location", "date_posted", "posted_ts", "found_at", "is_new"],
+    "notifications": ["id", "message", "created_at", "read"],
+    "settings": ["key", "value"],
+    "company_reviews": ["company", "summary", "resolved_name", "status", "generated_at"]
+  },
+  "routes": [
+    { "path": "/", "method": "GET", "purpose": "Empleos: lista + filtros (texto, fuente, búsqueda, días)" },
+    { "path": "/mark-seen", "method": "POST", "purpose": "Marca todos los empleos como vistos" },
+    { "path": "/notifications", "method": "GET", "purpose": "Historial de notificaciones (marca leídas)" },
+    { "path": "/notifications/clear", "method": "POST", "purpose": "Borra notificaciones" },
+    { "path": "/searches", "method": "GET/POST", "purpose": "Gestiona búsquedas: alta, keywords de título, modo ubicación, ventana" },
+    { "path": "/run", "method": "POST", "purpose": "Buscar ahora (todas las activas o una)" },
+    { "path": "/companies", "method": "GET", "purpose": "Empleadores reales agregados del campo company" },
+    { "path": "/companies/summary", "method": "POST", "purpose": "Genera/cachea resumen de opiniones (JSON si AJAX)" },
+    { "path": "/companies/glassdoor-name", "method": "POST", "purpose": "Override manual del nombre para Glassdoor" },
+    { "path": "/favicon.svg /favicon.ico", "method": "GET", "purpose": "Favicon SVG servido por Flask" },
+    { "path": "/api/unread", "method": "GET", "purpose": "Nº de notificaciones sin leer (polling badge)" },
+    { "path": "/api/jobs-status", "method": "GET", "purpose": "total + último id de jobs (barra de empleos nuevos)" }
+  ],
+  "deployment": {
+    "web_service": { "unit": "jobhunter-web.service", "exec": ".venv/bin/python app.py", "port": 8080, "restart": "on-failure" },
+    "search_service": { "unit": "jobhunter-search.service", "exec": "run_search.sh", "type": "oneshot" },
+    "search_timer": { "unit": "jobhunter-search.timer", "schedule": "*-*-* 12:00:00 America/Bogota", "persistent": true }
+  },
+  "files": [
+    { "file": "db.py", "lines": 81, "role": "Esquema y helpers de SQLite" },
+    { "file": "fetcher.py", "lines": 615, "role": "9 fuentes, filtros (título/ubicación/fecha), orquestación" },
+    { "file": "app.py", "lines": 310, "role": "Servidor Flask, rutas, filtro Markdown, favicon" },
+    { "file": "reviews.py", "lines": 134, "role": "Resumen de opiniones vía Gemini + grounding" },
+    { "file": "run_search.sh", "lines": 6, "role": "Wrapper del cron con logging" },
+    { "file": "templates/", "lines": 399, "role": "Vistas Jinja2 (6 plantillas)" },
+    { "file": "deploy/", "lines": 34, "role": "Unidades systemd (referencia)" }
+  ],
+  "security": [
+    "Sin secretos en el repo: GEMINI_API_KEY vive en /etc/systemd/system/jobhunter-web.service.d/apikey.conf (root, 600)",
+    ".gitignore excluye .venv/, jobs.db*, *.log, apikey.conf",
+    "Filtro Markdown escapa HTML antes de renderizar resúmenes"
+  ]
+}
+</script>
+<script>
+(function(){
+  try{
+    var raw = document.getElementById('archData').textContent;
+    var obj = JSON.parse(raw);
+    document.getElementById('jsonPre').textContent = JSON.stringify(obj, null, 2);
+  }catch(e){ document.getElementById('jsonPre').textContent = 'architecture.json'; }
+})();
+</script>
+
+</body>
+</html>

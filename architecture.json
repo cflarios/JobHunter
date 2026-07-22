@@ -1,0 +1,147 @@
+{
+  "project": "JobHunter",
+  "description": "Buscador personal de empleos remotos auto-alojado en una Raspberry Pi. Enfocado en DevOps/SRE remoto (contractor desde Colombia), ampliable a cualquier rol.",
+  "generated": "2026-07-20",
+  "host": "Raspberry Pi (Debian 13, Python 3.13) — http://192.168.1.11:8080",
+  "stack": ["Python 3.13", "Flask", "SQLite (WAL)", "systemd", "Gemini API"],
+  "metrics": {
+    "sources": 9,
+    "db_tables": 5,
+    "http_routes": 13,
+    "python_lines": 1140,
+    "template_lines": 399,
+    "systemd_units": 3
+  },
+  "layers": [
+    {
+      "id": "triggers",
+      "name": "Disparadores",
+      "color": "blue",
+      "components": [
+        { "name": "jobhunter-search.timer", "detail": "systemd timer, OnCalendar=*-*-* 12:00:00 (America/Bogota), Persistent=true" },
+        { "name": "Usuario · Buscar ahora", "detail": "POST /run desde la UI, manual" }
+      ]
+    },
+    {
+      "id": "ingest",
+      "name": "Ingesta / Orquestación",
+      "color": "blue",
+      "components": [
+        { "name": "run_search.sh", "detail": "wrapper del cron; registra en search.log" },
+        { "name": "fetcher.run_all()", "detail": "recorre búsquedas activas y aplica ventana/modo por búsqueda" },
+        { "name": "fetcher.run_search()", "detail": "consulta las 9 fuentes, filtra, deduplica, inserta y notifica" }
+      ]
+    },
+    {
+      "id": "sources",
+      "name": "Fuentes (API / RSS público, sin key)",
+      "color": "blue",
+      "components": [
+        { "name": "Remotive", "detail": "API JSON, search=query" },
+        { "name": "RemoteOK", "detail": "API JSON, feed completo" },
+        { "name": "Jobicy", "detail": "API JSON, tag=query" },
+        { "name": "Himalayas", "detail": "API JSON" },
+        { "name": "WeWorkRemotely", "detail": "RSS: DevOps/Sysadmin + Programming" },
+        { "name": "Arbeitnow", "detail": "API JSON (solo remotos)" },
+        { "name": "The Muse", "detail": "API JSON, location=Flexible/Remote" },
+        { "name": "Working Nomads", "detail": "API JSON" },
+        { "name": "Landing.jobs", "detail": "API JSON (incluye salario)" }
+      ]
+    },
+    {
+      "id": "filters",
+      "name": "Pipeline de filtros (uniforme a todas las fuentes)",
+      "color": "green",
+      "components": [
+        { "name": "title_ok()", "detail": "el TÍTULO debe contener alguna palabra clave del rol (p. ej. devops, sre, site reliability)" },
+        { "name": "location_ok()", "detail": "modo worldwide (por defecto) / americas / any; descarta locks a país/estado que excluyen a Colombia" },
+        { "name": "ventana de días", "detail": "posted_ts dentro de max_age_days (por búsqueda o global)" },
+        { "name": "dedup", "detail": "INSERT OR IGNORE por URL única" }
+      ]
+    },
+    {
+      "id": "store",
+      "name": "Almacenamiento",
+      "color": "green",
+      "components": [
+        { "name": "SQLite jobs.db (WAL)", "detail": "db.py; 5 tablas" }
+      ]
+    },
+    {
+      "id": "web",
+      "name": "Capa web (Flask)",
+      "color": "violet",
+      "components": [
+        { "name": "app.py", "detail": "13 rutas + filtro Markdown seguro + favicon SVG" },
+        { "name": "templates/", "detail": "Jinja2: base, index, searches, notifications, companies, _review" }
+      ]
+    },
+    {
+      "id": "client",
+      "name": "Cliente (navegador)",
+      "color": "violet",
+      "components": [
+        { "name": "Empleos", "detail": "lista + filtros + barra de 'empleos nuevos' (sondeo 45s)" },
+        { "name": "Compañías", "detail": "empleadores reales + Glassdoor + resumen AJAX con spinner" },
+        { "name": "Notificaciones", "detail": "badge que sondea /api/unread cada 30s" }
+      ]
+    },
+    {
+      "id": "external",
+      "name": "Integración externa",
+      "color": "amber",
+      "components": [
+        { "name": "reviews.py → Gemini 2.5 Flash", "detail": "grounding con Google Search; thinkingBudget=0 para no truncar; resume reputación (Glassdoor)" },
+        { "name": "GEMINI_API_KEY", "detail": "override de systemd (root, 600), fuera del repo" }
+      ]
+    }
+  ],
+  "data_flow": [
+    "Timer 12:00 (o Usuario) → run_search.sh → fetcher.run_all()",
+    "run_search() → 9 fuentes (HTTP) → filtros (título, ubicación, fecha, dedup)",
+    "→ INSERT OR IGNORE en jobs + INSERT notificación si hay nuevos",
+    "Flask lee jobs.db → renderiza Empleos/Compañías/Notificaciones",
+    "Navegador sondea /api/jobs-status (45s) y /api/unread (30s) para avisar sin recargar",
+    "Compañías: botón → POST /companies/summary → reviews.py → Gemini (grounding) → cachea en company_reviews → HTML del resumen (AJAX)"
+  ],
+  "db_schema": {
+    "searches": ["id", "query", "title_keywords", "max_age_days", "active", "created_at"],
+    "jobs": ["id", "search_id→searches", "title", "company", "url (unique)", "source", "salary", "location", "date_posted", "posted_ts", "found_at", "is_new"],
+    "notifications": ["id", "message", "created_at", "read"],
+    "settings": ["key", "value"],
+    "company_reviews": ["company", "summary", "resolved_name", "status", "generated_at"]
+  },
+  "routes": [
+    { "path": "/", "method": "GET", "purpose": "Empleos: lista + filtros (texto, fuente, búsqueda, días)" },
+    { "path": "/mark-seen", "method": "POST", "purpose": "Marca todos los empleos como vistos" },
+    { "path": "/notifications", "method": "GET", "purpose": "Historial de notificaciones (marca leídas)" },
+    { "path": "/notifications/clear", "method": "POST", "purpose": "Borra notificaciones" },
+    { "path": "/searches", "method": "GET/POST", "purpose": "Gestiona búsquedas: alta, keywords de título, modo ubicación, ventana" },
+    { "path": "/run", "method": "POST", "purpose": "Buscar ahora (todas las activas o una)" },
+    { "path": "/companies", "method": "GET", "purpose": "Empleadores reales agregados del campo company" },
+    { "path": "/companies/summary", "method": "POST", "purpose": "Genera/cachea resumen de opiniones (JSON si AJAX)" },
+    { "path": "/companies/glassdoor-name", "method": "POST", "purpose": "Override manual del nombre para Glassdoor" },
+    { "path": "/favicon.svg /favicon.ico", "method": "GET", "purpose": "Favicon SVG servido por Flask" },
+    { "path": "/api/unread", "method": "GET", "purpose": "Nº de notificaciones sin leer (polling badge)" },
+    { "path": "/api/jobs-status", "method": "GET", "purpose": "total + último id de jobs (barra de empleos nuevos)" }
+  ],
+  "deployment": {
+    "web_service": { "unit": "jobhunter-web.service", "exec": ".venv/bin/python app.py", "port": 8080, "restart": "on-failure" },
+    "search_service": { "unit": "jobhunter-search.service", "exec": "run_search.sh", "type": "oneshot" },
+    "search_timer": { "unit": "jobhunter-search.timer", "schedule": "*-*-* 12:00:00 America/Bogota", "persistent": true }
+  },
+  "files": [
+    { "file": "db.py", "lines": 81, "role": "Esquema y helpers de SQLite" },
+    { "file": "fetcher.py", "lines": 615, "role": "9 fuentes, filtros (título/ubicación/fecha), orquestación" },
+    { "file": "app.py", "lines": 310, "role": "Servidor Flask, rutas, filtro Markdown, favicon" },
+    { "file": "reviews.py", "lines": 134, "role": "Resumen de opiniones vía Gemini + grounding" },
+    { "file": "run_search.sh", "lines": 6, "role": "Wrapper del cron con logging" },
+    { "file": "templates/", "lines": 399, "role": "Vistas Jinja2 (6 plantillas)" },
+    { "file": "deploy/", "lines": 34, "role": "Unidades systemd (referencia)" }
+  ],
+  "security": [
+    "Sin secretos en el repo: GEMINI_API_KEY vive en /etc/systemd/system/jobhunter-web.service.d/apikey.conf (root, 600)",
+    ".gitignore excluye .venv/, jobs.db*, *.log, apikey.conf",
+    "Filtro Markdown escapa HTML antes de renderizar resúmenes"
+  ]
+}
