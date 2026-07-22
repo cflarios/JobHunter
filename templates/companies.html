@@ -8,8 +8,9 @@
 </div>
 <p class="muted" style="margin-top:0">Empleadores reales detrás de las ofertas (no las bolsas de empleo). Genera un resumen de opiniones o abre su página de Glassdoor.</p>
 
+<div id="companies-list">
 {% for c in companies %}
-<div class="card" id="c-{{ c.name|urlencode }}">
+<div class="card company-card" id="c-{{ c.name|urlencode }}">
   <div class="row" style="justify-content:space-between;align-items:flex-start">
     <div style="flex:1;min-width:55%">
       <div style="font-size:17px;font-weight:600">{{ c.name }}</div>
@@ -42,8 +43,12 @@
 {% else %}
 <div class="card muted">Aún no hay compañías. Aparecerán cuando una búsqueda encuentre ofertas con empresa identificada.</div>
 {% endfor %}
+</div>
+<div id="companies-pager" class="pager"></div>
 
 <script>
+jhPaginate(document.getElementById('companies-list'), '.company-card', 10,
+           document.getElementById('companies-pager'));
 document.querySelectorAll('form.gen-form').forEach(function(form){
   form.addEventListener('submit', function(e){
     e.preventDefault();

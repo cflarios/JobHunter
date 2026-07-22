@@ -55,7 +55,57 @@ table{width:100%;border-collapse:collapse}
   vertical-align:-2px;margin-right:5px}
 @keyframes spin{to{transform:rotate(360deg)}}
 button[disabled]{opacity:.75;cursor:progress}
+.pager{display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:center;margin:20px 0 6px}
+.pgbtn{min-width:34px;height:34px;padding:0 10px;background:var(--card);border:1px solid var(--line);
+  color:var(--txt);border-radius:8px;font-size:13px;cursor:pointer;font-family:inherit}
+.pgbtn:hover:not([disabled]):not(.active){border-color:var(--accent);color:var(--accent)}
+.pgbtn.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700;cursor:default}
+.pgbtn[disabled]{opacity:.4;cursor:default}
+.pgdots{color:var(--mut);padding:0 2px}
 </style>
+<script>
+// Spinner al enviar formularios lentos (marcados con class="busy")
+document.addEventListener('submit', function(e){
+  var f = e.target;
+  if(!f.classList || !f.classList.contains('busy')) return;
+  var b = f.querySelector('button[type=submit]') || f.querySelector('button');
+  if(b && !b.disabled){
+    b.disabled = true;
+    b.innerHTML = '<span class="spinner"></span>' + (b.getAttribute('data-busy') || 'Cargando…');
+  }
+});
+
+// Paginador de cliente reutilizable
+window.jhPaginate = function(listEl, itemSel, size, pagerEl){
+  if(!listEl || !pagerEl) return;
+  var items = Array.prototype.slice.call(listEl.querySelectorAll(itemSel));
+  if(items.length <= size){ pagerEl.style.display = 'none'; return; }
+  var pages = Math.ceil(items.length / size), cur = 1;
+  function btn(label, page, o){
+    o = o || {}; var b = document.createElement('button');
+    b.className = 'pgbtn' + (o.active ? ' active' : ''); b.textContent = label;
+    if(o.disabled || o.active) b.disabled = true;
+    else b.addEventListener('click', function(){ cur = page; render();
+      listEl.scrollIntoView({behavior:'smooth', block:'start'}); });
+    return b;
+  }
+  function render(){
+    items.forEach(function(el, i){
+      el.style.display = (i >= (cur-1)*size && i < cur*size) ? '' : 'none';
+    });
+    pagerEl.innerHTML = '';
+    pagerEl.appendChild(btn('‹', cur-1, {disabled: cur===1}));
+    var start = Math.max(1, cur-2), end = Math.min(pages, start+4); start = Math.max(1, end-4);
+    if(start > 1){ pagerEl.appendChild(btn('1', 1, {}));
+      if(start > 2){ var d=document.createElement('span'); d.className='pgdots'; d.textContent='…'; pagerEl.appendChild(d); } }
+    for(var p=start; p<=end; p++) pagerEl.appendChild(btn(String(p), p, {active: p===cur}));
+    if(end < pages){ if(end < pages-1){ var d2=document.createElement('span'); d2.className='pgdots'; d2.textContent='…'; pagerEl.appendChild(d2); }
+      pagerEl.appendChild(btn(String(pages), pages, {})); }
+    pagerEl.appendChild(btn('›', cur+1, {disabled: cur===pages}));
+  }
+  render();
+};
+</script>
 </head>
 <body>
 <header><div class="wrap"><nav>
@@ -67,7 +117,6 @@ button[disabled]{opacity:.75;cursor:progress}
   <a href="{{ url_for('notifications') }}" class="{{ 'active' if request.endpoint=='notifications' }}">
     Notificaciones<span id="notif-badge" class="badge" style="display:none"></span></a>
   <a href="{{ url_for('architecture_page') }}">Arquitectura</a>
-  <a href="{{ url_for('workflow_page') }}">Flujo</a>
 </nav></div></header>
 <main><div class="wrap">
   {% with msgs = get_flashed_messages() %}

@@ -61,9 +61,9 @@
         <span class="pill">{{ s.njobs }} empleos</span>
       </div>
       <div class="row">
-        <form method="post" action="{{ url_for('run_now') }}">
+        <form method="post" action="{{ url_for('run_now') }}" class="busy">
           <input type="hidden" name="query" value="{{ s.query }}">
-          <button class="btn sm green" type="submit">▶ Buscar</button>
+          <button class="btn sm green" type="submit" data-busy="Buscando…">▶ Buscar</button>
         </form>
         <form method="post">
           <input type="hidden" name="action" value="toggle">
