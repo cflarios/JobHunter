@@ -1,0 +1,291 @@
+# JobHunter — Contexto del proyecto (documentación interna)
+
+> Documento de rumbo. El **README.md** es operativo (cómo se usa/despliega); este
+> archivo guarda el **por qué**, las **decisiones**, los **gotchas** y el **roadmap**
+> para no perder el hilo entre sesiones. Última actualización: 2026-07-22.
+
+---
+
+## 1. Objetivo
+
+Buscador **personal** de empleos remotos, auto-alojado en una **Raspberry Pi**.
+El usuario busca **DevOps Engineer / SRE remoto como contractor desde Colombia**.
+El sistema es **multi-rol** (se pueden añadir otras búsquedas), pero el foco por
+defecto es DevOps/SRE.
+
+Requisitos originales que guían el diseño:
+- Buscar empleos relacionados en internet, **publicados hace ≤ 3 días** (ajustable).
+- Correr **todos los días a las 12:00** (hora Colombia).
+- Página donde se **guarda** lo encontrado y que **genera notificaciones**.
+- El reporte debe incluir **dónde se publicó, salario y fecha**.
+
+Inspiración posterior: **reaver.ink** (matcheo de CV con IA). Su parte de pago la
+replicamos **gratis** con Gemini (ver §7).
+
+---
+
+## 2. Estado actual (stack y acceso)
+
+- **Stack:** Python 3.13 · Flask · SQLite (WAL) · systemd · Gemini API · RapidAPI.
+- **Host:** Raspberry Pi (Debian 13). App en `http://192.168.1.11:8080` (LAN).
+- **Repo git:** local, rama `main`, en `/home/pi/project/job-hunter/`.
+- **Fuentes:** 11 bolsas de empleo.
+- **IA:** Gemini 2.5 Flash (resúmenes de empresas + CV/matching).
+- **Mapas visuales:** `/architecture` y `/workflow` (dentro de la app y como
+  artefactos publicados). El botón "Ver como workflow" vive dentro de Arquitectura.
+
+---
+
+## 3. Estructura de archivos
+
+```
+job-hunter/
+├── app.py              # Servidor Flask: rutas, filtro Markdown, favicon, mapas
+├── db.py               # Esquema SQLite (7 tablas) + carga de .env (fallback)
+├── fetcher.py          # 11 fuentes, filtros (título/ubicación/fecha), orquestación
+├── reviews.py          # Resumen de reputación de empresas (Gemini + grounding)
+├── cv.py               # CV + IA: analizar, match, ¿encajo?, carta, mejorar (Gemini)
+├── run_search.sh       # Wrapper del cron (→ fetcher.py, log en search.log)
+├── templates/          # 8 vistas Jinja2 (base, index, searches, notifications,
+│                       #   companies, cv, _review, _fitblock)
+├── deploy/             # Copia de referencia de las unidades systemd (sin secretos)
+├── architecture.json   # Modelo estructurado del sistema (fuente de verdad)
+├── architecture.html   # Mapa visual autocontenido (embebe el JSON)
+├── workflow.html       # Workflow interactivo tipo n8n (nodos + aristas)
+├── .env                # SECRETOS (gitignored, 600) — no se versiona
+├── .env.example        # Plantilla versionada
+├── README.md           # Operativo
+└── CONTEXT.md          # Este documento
+```
+
+También hay **memoria de Claude** en
+`~/.claude/projects/-home-pi-project/memory/` (`jobhunter-project.md`,
+`jobhunter-live-settings.md`) — se cargan como contexto en cada sesión.
+
+---
+
+## 4. Flujo de datos (resumen)
+
+```
+Timer 12:00 (o Usuario "Buscar ahora")
+   → run_search.sh → fetcher.run_all()
+      → run_search(): consulta las 11 fuentes (HTTP)
+         → filtros uniformes: title_ok → location_ok → ventana de días → dedup(URL)
+            → INSERT OR IGNORE en `jobs` + notificación si hay nuevos
+   → Flask lee jobs.db → Empleos / Compañías / Mi CV / Notificaciones
+   → El navegador sondea /api/jobs-status (45s) y /api/unread (30s) para avisar
+     sin recargar.
+
+Ramas bajo demanda (Gemini):
+   Compañías → /companies/summary → reviews.py → Gemini(grounding) → company_reviews
+   Mi CV     → /cv/analyze → cv.py → Gemini → profile
+             → /cv/match → job_matches → afinidad en Empleos
+             → /jobs/{id}/fit y /cover → análisis y carta por oferta
+```
+
+Ver el detalle visual en `/architecture` y `/workflow`.
+
+---
+
+## 5. Fuentes de empleo (11)
+
+| Fuente | Tipo | Notas |
+|---|---|---|
+| Remotive | API JSON | `search=query` |
+| RemoteOK | API JSON | feed completo, filtro local |
+| Jobicy | API JSON | `tag=query` — **devuelve todo su feed**, el filtro de título es imprescindible |
+| Himalayas | API JSON | feed de remotos |
+| WeWorkRemotely | RSS ×2 | feeds DevOps/Sysadmin + Programming |
+| Arbeitnow | API JSON | solo empleos remotos |
+| The Muse | API JSON | `location=Flexible/Remote`, 2 páginas |
+| Working Nomads | API JSON | todas las categorías |
+| Landing.jobs | API JSON | incluye salario; usa códigos ISO de país (mapeados) |
+| Get on Board | API JSON v0 | LATAM, salario USD; empresa vía `/companies/{id}` (caché acotada) |
+| **LinkedIn** | **RapidAPI** | `linkedin-job-search-api` endpoint `active-jb`; salario/modalidad/skills |
+
+**Añadir una fuente pública:** escribir `fetch_x(query)` en `fetcher.py` que
+devuelva dicts con `title/company/url/source/salary/location/posted_ts` (+ `_text`
+para el match de título) y agregarla a la lista `SOURCES`.
+
+**Añadir una fuente de RapidAPI:** usar el helper genérico
+`_rapidapi_get(host, path, params)` (pone cabeceras `x-rapidapi-host/key`),
+escribir `fetch_x` y sumarla a `SOURCES`. Si falta `RAPIDAPI_KEY`, esas fuentes
+se **omiten en silencio**. Es el camino preparado para más APIs de RapidAPI.
+
+---
+
+## 6. Filtros (aplicados por igual a todas las fuentes)
+
+En `fetcher.run_search()`, en este orden:
+
+1. **`title_ok(title, keywords, query)`** — el **TÍTULO** debe contener alguna
+   palabra clave del rol. Cada búsqueda tiene `title_keywords` (p. ej.
+   `devops, sre, site reliability`). Evita roles tangenciales ("Data Engineer que
+   menciona DevOps"). Si no hay keywords, exige que el título contenga todos los
+   tokens de la query.
+2. **`location_ok(location, mode)`** — modos:
+   - `worldwide` (por defecto): solo abiertos a cualquier parte o que incluyan
+     LATAM/Americas/Colombia; descarta locks a país/estado.
+   - `americas`: todo el continente (incluye US-only).
+   - `any`: sin filtro.
+3. **Ventana de días** — `posted_ts` dentro de `max_age_days` (por búsqueda o global).
+4. **Dedup** — `INSERT OR IGNORE` por URL única.
+
+Configurable desde la página **Búsquedas** (por búsqueda) y con ajustes globales.
+
+---
+
+## 7. IA con Gemini (gratis)
+
+**Modelo:** `gemini-2.5-flash`. **Gotcha crítico:** Gemini 2.5 gasta tokens de
+"thinking" que cuentan contra `maxOutputTokens` y **truncan** la salida
+(`finishReason: MAX_TOKENS`). Solución: `thinkingConfig.thinkingBudget = 0` +
+`maxOutputTokens` holgado. Para JSON fiable: `responseMimeType: application/json`.
+
+- **`reviews.py`** — resumen de reputación de empresas (Glassdoor) con **grounding
+  de Google Search**. Glassdoor no tiene API pública gratis ni permite scraping,
+  por eso se resume desde la web. Resuelve el nombre canónico para el enlace de
+  Glassdoor y cachea en `company_reviews`.
+- **`cv.py`** — funciones inspiradas en reaver.ink:
+  - `analyze_cv` (PDF inline o texto) → perfil (rol, seniority, años, skills, keywords).
+  - `match_jobs` → afinidad 0–100 por empleo (badge y orden en Empleos).
+  - `analyze_fit` → "¿Encajo aquí?" por oferta (coincidencias, gaps, qué resaltar).
+  - `cover_letter` → carta de presentación a medida.
+  - `improve_cv` → feedback Harvard/ATS + reescritura.
+
+**Privacidad:** el CV se guarda **solo en la Pi** (`profile`/`job_matches`);
+"Borrar perfil" lo elimina.
+
+---
+
+## 8. Base de datos (SQLite `jobs.db`, WAL) — 7 tablas
+
+| Tabla | Para qué |
+|---|---|
+| `searches` | Búsquedas: query, title_keywords, max_age_days, active |
+| `jobs` | Empleos: title, company, url (unique), source, salary, location, posted_ts, is_new |
+| `notifications` | Avisos de hallazgos (read) |
+| `settings` | Config global (location_mode, max_age_days, last_run…) |
+| `company_reviews` | Caché de resúmenes de empresa + resolved_name |
+| `profile` | Perfil del CV (1 fila): role, skills, summary, suggested_keywords, feedback, rewrite |
+| `job_matches` | Afinidad por empleo: score, reason, fit_detail |
+
+---
+
+## 9. Rutas HTTP principales
+
+Empleos `/` · Buscar ahora `/run` · Búsquedas `/searches` · Notificaciones
+`/notifications` · Compañías `/companies` (+ `/companies/summary`,
+`/companies/glassdoor-name`) · **Mi CV** `/cv` (+ `/cv/analyze`, `/cv/match`,
+`/cv/improve`, `/cv/apply-keywords`) · por oferta `/jobs/<id>/fit` y `/cover` ·
+mapas `/architecture` `/architecture.json` `/workflow` · polling `/api/unread`
+`/api/jobs-status`.
+
+---
+
+## 10. Despliegue (systemd)
+
+- **`jobhunter-web.service`** — servidor Flask, puerto 8080, arranca en boot,
+  `Restart=on-failure`.
+- **`jobhunter-search.service`** — `oneshot`, lanza `run_search.sh`.
+- **`jobhunter-search.timer`** — `OnCalendar=*-*-* 12:00:00` (America/Bogota),
+  `Persistent=true` (recupera la corrida si la Pi estuvo apagada al mediodía).
+
+**Gotcha:** los **dos** servicios necesitan las API keys (el `search` usa
+`RAPIDAPI_KEY` para LinkedIn; el `web` usa ambas para "Buscar ahora" y la IA).
+Ambos cargan las variables con `EnvironmentFile=…/.env`.
+
+Comandos útiles:
+```bash
+sudo systemctl status jobhunter-web.service        # estado del sitio
+systemctl list-timers jobhunter-search.timer       # próxima corrida
+sudo systemctl start jobhunter-search.service      # forzar búsqueda ahora
+tail -f /home/pi/project/job-hunter/search.log     # log de búsquedas
+sudo systemctl restart jobhunter-web.service       # tras cambios en app/templates
+```
+
+---
+
+## 11. Secretos y `.env`
+
+- Las claves (`GEMINI_API_KEY`, `RAPIDAPI_KEY`) viven **solo** en `.env`
+  (permisos 600, **gitignored**). `.env.example` es la plantilla versionada.
+- Carga: systemd con `EnvironmentFile` **y** `db.py` como fallback (`setdefault`,
+  no pisa variables ya definidas) para ejecuciones manuales.
+- **Si se mueve el proyecto de carpeta**, actualizar la ruta absoluta del
+  `EnvironmentFile` en los dos drop-ins de systemd
+  (`/etc/systemd/system/jobhunter-{web,search}.service.d/apikey.conf`).
+- Las keys de Gemini/RapidAPI actuales son de **prueba**; rotar cuando toque.
+
+---
+
+## 12. Decisiones clave (y por qué)
+
+- **Modo de ubicación `worldwide` por defecto** — como contractor desde Colombia
+  no sirven empleos geo-locked a un estado/país. Se conservan solo los realmente
+  abiertos o que incluyan LATAM/Americas/Colombia. Para ver US-remote, cambiar a
+  modo `americas`.
+- **Filtro por título, no por descripción** — evita falsos positivos y la basura
+  del feed completo de Jobicy.
+- **Ventana ≤ 3 días** es la del usuario; si un día no hay nada nuevo, es correcto
+  (los feeds a veces publican con 4–6 días de retraso).
+- **Resúmenes/CV con Gemini** en vez de Anthropic — el usuario no tiene API key de
+  Anthropic; usa Google AI Studio (Gemini).
+- **Paginación y ciertos spinners en cliente** — se pidió "frontend puro".
+- **Compañías y "¿Encajo?" por AJAX** — spinner garantizado y sin recargar; los
+  botones de búsqueda usan spinner síncrono (`class="busy"`).
+
+---
+
+## 13. Limitaciones y gotchas conocidos
+
+- **El usuario edita la config en vivo desde la web** (ventana, keywords, modo).
+  **No pisar sus ajustes** sin preguntar (ver memoria `jobhunter-live-settings`).
+- **Filtro de ubicación = blocklist de países/regiones**: es "whack-a-mole".
+  LinkedIn devuelve nombres completos de ciudades/países del mundo; se ampliaron
+  mucho las listas, pero puede colarse algún remoto de un país no listado. En
+  modo `worldwide` esto rinde **pocos** resultados de LinkedIn (muy geo-etiquetado).
+- **El match del CV usa solo el TÍTULO del empleo** (no guardamos la descripción).
+  Es suficiente para ranking, pero mejorable si algún día guardamos un extracto.
+- **La lista de empleos no se auto-refresca**; hay una barra "empleos nuevos"
+  (sondeo 45s) que avisa y recarga a un clic. El badge de notificaciones sí se
+  actualiza solo (30s).
+- **Los mapas (architecture/workflow) hay que regenerarlos a mano** cuando cambia
+  el sistema (contando fuentes, tablas, etc.).
+
+---
+
+## 14. Roadmap / próximos pasos
+
+- **Más fuentes de RapidAPI** (el camino ya está preparado con `_rapidapi_get`).
+- **Notificaciones por email** (SMTP con `cristianferlariosm@gmail.com`) cuando
+  aparezcan empleos nuevos — hoy son in-app.
+- **Acceso desde fuera de la LAN** (Tailscale / Cloudflare Tunnel) si se quiere
+  consultar desde el móvil con datos.
+- **Guardar un extracto de la descripción** del empleo para mejorar el match del CV.
+- **Auto-refresh opcional** de la lista de Empleos.
+- Publicar el repo en GitHub (hoy es local).
+
+---
+
+## 15. Cómo desarrollar / probar
+
+```bash
+cd /home/pi/project/job-hunter
+# venv
+source .venv/bin/activate   # o usar ./.venv/bin/python directamente
+
+# probar el fetcher (carga .env por db.py)
+./.venv/bin/python fetcher.py                 # corre todas las búsquedas activas
+./.venv/bin/python fetcher.py "Cloud Engineer" # una query puntual
+
+# probar módulos de IA (necesitan GEMINI_API_KEY del .env)
+./.venv/bin/python cv.py "texto del CV..."
+./.venv/bin/python reviews.py "GitLab"
+
+# tras editar app.py/templates:
+sudo systemctl restart jobhunter-web.service
+```
+
+**Convención:** al terminar un cambio no trivial, verificar en la app real
+(no solo con curl), y actualizar los mapas + este documento si el sistema cambió.
