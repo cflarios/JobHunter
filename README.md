@@ -35,10 +35,24 @@ Sin la key, el enlace a Glassdoor funciona igual; solo el resumen automático qu
 deshabilitado (con un aviso). Obtén una key gratis en https://aistudio.google.com/apikey
 Para cambiar de modelo, edita `MODEL` en `reviews.py`.
 
-## Fuentes (API/RSS público, sin API key) — 10
-Remotive · RemoteOK · Jobicy · Himalayas · WeWorkRemotely (DevOps + Programming) ·
-Arbeitnow · The Muse · Working Nomads · Landing.jobs (con salario) ·
-Get on Board (LATAM, con salario en USD)
+## Fuentes — 11
+Sin API key (10): Remotive · RemoteOK · Jobicy · Himalayas · WeWorkRemotely
+(DevOps + Programming) · Arbeitnow · The Muse · Working Nomads · Landing.jobs
+(con salario) · Get on Board (LATAM, con salario en USD).
+
+Vía RapidAPI (con key): **LinkedIn** (`linkedin-job-search-api`) — LinkedIn tiene
+la API cerrada, así que se accede por RapidAPI. Aporta salario, modalidad
+(remoto/híbrido) y skills. Nota: los empleos de LinkedIn están muy geo-etiquetados;
+en modo de ubicación "mundial" rinden pocos (solo remotos abiertos / LATAM), y en
+modo "América" aparecen los US-remote.
+
+### RapidAPI (para añadir más APIs de esta plataforma)
+La key se guarda como `RAPIDAPI_KEY` en el override de systemd de **ambos**
+servicios (web y search), fuera del repo. En `fetcher.py` hay un helper genérico
+`_rapidapi_get(host, path, params)` que pone las cabeceras `x-rapidapi-host/key`.
+Añadir otra fuente de RapidAPI = escribir `fetch_x(query)` que llame a
+`_rapidapi_get(...)` y agregarla a `SOURCES`. Si falta la key, esas fuentes se
+omiten en silencio.
 
 ## Mi CV + IA (Gemini) — pestaña "Mi CV"
 Sube tu CV (PDF o texto pegado) y Gemini:

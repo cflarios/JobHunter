@@ -7,6 +7,7 @@ Fuentes con API/feed público (sin API key):
   - Himalayas       https://himalayas.app/jobs/api
   - WeWorkRemotely  RSS por categoria
 """
+import os
 import re
 import time
 import html
@@ -137,10 +138,19 @@ _OUTSIDE_AMERICAS = [
     "wales", "ireland", "germany", "france", "spain", "netherlands", "poland",
     "portugal", "italy", "sweden", "norway", "denmark", "finland", "romania",
     "bulgaria", "ukraine", "hungary", "czech", "greece", "turkey",
+    "austria", "switzerland", "belgium", "luxembourg", "netherlands", "croatia",
+    "serbia", "slovakia", "slovenia", "lithuania", "latvia", "estonia", "cyprus",
+    "malta", "iceland", "russia", "belarus", "moldova", "albania",
+    "north macedonia", "macedonia", "bosnia", "herzegovina", "srpska", "kosovo",
+    "montenegro", "armenia", "azerbaijan", "uzbekistan", "georgia (country)",
     "apac", "apj", "asia", "africa", "south africa", "australia", "new zealand",
-    "oceania", "india", "middle east", "gcc", "dubai", "uae", "israel", "saudi",
+    "oceania", "india", "middle east", "gcc", "dubai", "uae",
+    "united arab emirates", "qatar", "kuwait", "bahrain", "oman", "jordan",
+    "lebanon", "israel", "saudi", "morocco", "tunisia", "algeria",
     "singapore", "philippines", "indonesia", "malaysia", "vietnam", "thailand",
+    "cambodia", "myanmar", "nepal", "kazakhstan", "mongolia", "taiwan",
     "japan", "china", "hong kong", "korea", "pakistan", "egypt", "nigeria",
+    "ghana", "tanzania", "uganda", "ethiopia", "zimbabwe",
     "kenya", "bangladesh", "sri lanka",
 ]
 # Ubicaciones especificas de America (permitidas solo en modo 'americas').
@@ -557,9 +567,84 @@ def fetch_getonbrd(query):
     return out
 
 
+# --------------------------------------------------------------------------- #
+# RapidAPI — infraestructura reutilizable para fuentes de esta plataforma.     #
+# Cada fuente RapidAPI llama a _rapidapi_get(host, path, params). La API key    #
+# se lee de RAPIDAPI_KEY (override de systemd, fuera del repo); si falta, la    #
+# fuente se omite en silencio (devuelve []).                                    #
+# --------------------------------------------------------------------------- #
+def rapidapi_enabled():
+    return bool(os.environ.get("RAPIDAPI_KEY"))
+
+
+def _rapidapi_get(host, path, params):
+    """GET a un endpoint de RapidAPI. Devuelve JSON o None (si falta key/err)."""
+    key = os.environ.get("RAPIDAPI_KEY")
+    if not key:
+        return None
+    try:
+        r = requests.get(
+            f"https://{host}/{path}", params=params,
+            headers={"x-rapidapi-host": host, "x-rapidapi-key": key,
+                     "Content-Type": "application/json"},
+            timeout=TIMEOUT,
+        )
+        r.raise_for_status()
+        return r.json()
+    except Exception as e:
+        print(f"  [RapidAPI {host}] error:", e)
+        return None
+
+
+def fetch_linkedin(query):
+    """LinkedIn vía RapidAPI (linkedin-job-search-api). Requiere RAPIDAPI_KEY."""
+    out = []
+    data = _rapidapi_get(
+        "linkedin-job-search-api.p.rapidapi.com", "active-jb",
+        {"time_frame": "7d", "title": query, "limit": 100},
+    )
+    if not data:
+        return out
+    for j in data:
+        if not isinstance(j, dict):
+            continue
+        locs = j.get("locations_derived") or []
+        wa = (j.get("ai_work_arrangement") or "").strip()
+        is_remote = "remote" in wa.lower()
+        loc_str = ", ".join(locs)
+        if is_remote:
+            location = f"Remote · {loc_str}" if loc_str else "Remote"
+        else:
+            location = loc_str or "—"
+        # Salario (campos derivados por IA de la API).
+        sal = ""
+        lo, hi = j.get("ai_salary_min_value"), j.get("ai_salary_max_value")
+        cur = j.get("ai_salary_currency") or ""
+        unit = (j.get("ai_salary_unit_text") or "").lower()
+        if lo and hi:
+            try:
+                sal = f"{cur} {int(lo):,} - {int(hi):,}".strip()
+                if unit:
+                    sal += f" / {unit}"
+            except (TypeError, ValueError):
+                sal = ""
+        skills = j.get("ai_key_skills") or []
+        out.append({
+            "title": j.get("title"),
+            "company": j.get("organization"),
+            "url": j.get("url"),
+            "source": "LinkedIn",
+            "salary": sal,
+            "location": location,
+            "posted_ts": _to_ts(j.get("date_posted") or j.get("date_created")),
+            "_text": f"{j.get('title','')} {' '.join(skills) if isinstance(skills, list) else skills}",
+        })
+    return out
+
+
 SOURCES = [fetch_remotive, fetch_remoteok, fetch_jobicy, fetch_himalayas,
            fetch_wwr, fetch_arbeitnow, fetch_themuse, fetch_workingnomads,
-           fetch_landingjobs, fetch_getonbrd]
+           fetch_landingjobs, fetch_getonbrd, fetch_linkedin]
 
 
 # --------------------------------------------------------------------------- #
