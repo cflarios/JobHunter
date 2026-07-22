@@ -695,12 +695,16 @@ SOURCES = [fetch_remotive, fetch_remoteok, fetch_jobicy, fetch_himalayas,
            fetch_wwr, fetch_arbeitnow, fetch_themuse, fetch_workingnomads,
            fetch_landingjobs, fetch_getonbrd, fetch_linkedin, fetch_jsearch]
 
+# Fuentes vía RapidAPI (cuota limitada): solo se consultan si el usuario lo
+# activa (setting use_rapidapi=1). Por defecto están apagadas.
+RAPIDAPI_SOURCES = {fetch_linkedin, fetch_jsearch}
+
 
 # --------------------------------------------------------------------------- #
 # Orquestacion                                                                #
 # --------------------------------------------------------------------------- #
 def run_search(con, query, max_age_days=MAX_AGE_DAYS_DEFAULT,
-               title_keywords=None, location_mode="worldwide"):
+               title_keywords=None, location_mode="worldwide", use_rapidapi=False):
     """Ejecuta todas las fuentes para una query y guarda los empleos nuevos.
 
     Filtros aplicados por igual a todas las fuentes:
@@ -708,10 +712,14 @@ def run_search(con, query, max_age_days=MAX_AGE_DAYS_DEFAULT,
       2. Publicado dentro de max_age_days.
       3. La ubicacion debe pasar el filtro segun location_mode
          ('worldwide' | 'americas' | 'any').
+
+    Las fuentes de RapidAPI (cuota limitada) solo se consultan si use_rapidapi=True.
     """
     cutoff = _now_ts() - max_age_days * 86400
     raw = []
     for src in SOURCES:
+        if src in RAPIDAPI_SOURCES and not use_rapidapi:
+            continue
         raw.extend(src(query))
 
     seen_urls = set()
@@ -770,6 +778,7 @@ def run_all(query_override=None):
     con = get_db()
     max_age = int(get_setting(con, "max_age_days", MAX_AGE_DAYS_DEFAULT) or MAX_AGE_DAYS_DEFAULT)
     location_mode = get_setting(con, "location_mode", "worldwide")
+    use_rapidapi = get_setting(con, "use_rapidapi", "0") == "1"
     if query_override:
         rows = con.execute(
             "SELECT query,title_keywords,max_age_days FROM searches WHERE query=?",
@@ -792,7 +801,7 @@ def run_all(query_override=None):
     for r in rows:
         q, kws = r["query"], r["title_keywords"]
         age = r["max_age_days"] or max_age  # ventana propia o global por defecto
-        new, seen = run_search(con, q, age, kws, location_mode)
+        new, seen = run_search(con, q, age, kws, location_mode, use_rapidapi)
         print(f"  «{q}» (≤{age}d): {seen} coinciden, {new} nuevos")
         total_new += new
 

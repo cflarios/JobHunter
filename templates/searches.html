@@ -38,6 +38,28 @@
   </p>
 </div>
 
+<div class="card" style="border-color:{{ 'var(--amber)' if use_rapidapi else 'var(--line)' }}">
+  <div class="row" style="justify-content:space-between;align-items:flex-start">
+    <div>
+      <h3 style="margin:0 0 4px">Fuentes RapidAPI (LinkedIn · JSearch)</h3>
+      <p class="muted" style="margin:0;font-size:13px;max-width:60ch">
+        Tienen <b>cuota mensual limitada</b>. Por eso están <b>apagadas por defecto</b>:
+        el resto de fuentes (10, gratuitas) se usan siempre; estas dos solo se consultan
+        si marcas la casilla. Recuerda desactivarlas si no las necesitas.
+      </p>
+    </div>
+    <form method="post" id="rapidapi-form">
+      <input type="hidden" name="action" value="set_rapidapi">
+      <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;font-weight:600">
+        <input type="checkbox" name="rapidapi" value="1" {{ 'checked' if use_rapidapi }}
+               onchange="document.getElementById('rapidapi-form').submit()"
+               style="width:18px;height:18px;accent-color:var(--amber);cursor:pointer">
+        {{ 'Activadas' if use_rapidapi else 'Desactivadas' }}
+      </label>
+    </form>
+  </div>
+</div>
+
 <div class="card">
   <h3 style="margin-top:0">Ventana global por defecto</h3>
   <p class="muted" style="margin:0 0 10px;font-size:13px">Se aplica a las búsquedas que no tengan una ventana propia definida arriba.</p>

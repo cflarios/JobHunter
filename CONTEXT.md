@@ -110,8 +110,15 @@ para el match de título) y agregarla a la lista `SOURCES`.
 
 **Añadir una fuente de RapidAPI:** usar el helper genérico
 `_rapidapi_get(host, path, params)` (pone cabeceras `x-rapidapi-host/key`),
-escribir `fetch_x` y sumarla a `SOURCES`. Si falta `RAPIDAPI_KEY`, esas fuentes
-se **omiten en silencio**. Es el camino preparado para más APIs de RapidAPI.
+escribir `fetch_x`, sumarla a `SOURCES` **y** a `RAPIDAPI_SOURCES` (para que el
+interruptor la cubra). Si falta `RAPIDAPI_KEY`, esas fuentes se **omiten en
+silencio**.
+
+**Interruptor RapidAPI (cuota limitada):** las fuentes de `RAPIDAPI_SOURCES`
+(LinkedIn, JSearch) están **apagadas por defecto** y solo se consultan si el
+setting `use_rapidapi=1` (casilla "Fuentes RapidAPI" en la página Búsquedas).
+`run_search(..., use_rapidapi)` las salta cuando está apagado, así el cron no
+gasta cuota. Recordar apagarlas cuando no se necesiten.
 
 ---
 

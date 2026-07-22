@@ -173,6 +173,10 @@ def searches():
                 mode = "worldwide"
             set_setting(con, "location_mode", mode)
             flash("Filtro de ubicación actualizado.", "ok")
+        elif action == "set_rapidapi":
+            on = "1" if request.form.get("rapidapi") else "0"
+            set_setting(con, "use_rapidapi", on)
+            flash("Fuentes RapidAPI " + ("activadas." if on == "1" else "desactivadas."), "ok")
         con.commit()
         con.close()
         return redirect(url_for("searches"))
@@ -182,9 +186,10 @@ def searches():
         FROM searches s ORDER BY s.active DESC, s.id""").fetchall()
     max_age = get_setting(con, "max_age_days", "3")
     location_mode = get_setting(con, "location_mode", "worldwide")
+    use_rapidapi = get_setting(con, "use_rapidapi", "0") == "1"
     con.close()
     return render_template("searches.html", searches=rows, max_age=max_age,
-                           location_mode=location_mode)
+                           location_mode=location_mode, use_rapidapi=use_rapidapi)
 
 
 @app.route("/run", methods=["POST"])

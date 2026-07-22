@@ -40,7 +40,10 @@ Sin API key (10): Remotive · RemoteOK · Jobicy · Himalayas · WeWorkRemotely
 (DevOps + Programming) · Arbeitnow · The Muse · Working Nomads · Landing.jobs
 (con salario) · Get on Board (LATAM, con salario en USD).
 
-Vía RapidAPI (con `RAPIDAPI_KEY`):
+Vía RapidAPI (con `RAPIDAPI_KEY`) — **apagadas por defecto** (cuota limitada); se
+activan con la casilla **"Fuentes RapidAPI"** en la página Búsquedas
+(setting `use_rapidapi`). Con el interruptor apagado, el cron diario y "Buscar
+ahora" solo usan las 10 fuentes gratuitas y no gastan cuota.
 - **LinkedIn** (`linkedin-job-search-api`, endpoint `active-jb`) — salario,
   modalidad y skills. Muy geo-etiquetado: en modo "mundial" rinde poco; usar modo
   "América" para US-remote. El plan BASIC tiene **cuota mensual** limitada (al
