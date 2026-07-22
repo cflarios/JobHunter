@@ -1,7 +1,26 @@
 import os
 import sqlite3
 
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "jobs.db")
+_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(_DIR, "jobs.db")
+
+
+def _load_dotenv():
+    """Carga el .env del proyecto (KEY=value) sin pisar variables ya definidas.
+    Respaldo para ejecuciones manuales; en producción systemd usa EnvironmentFile."""
+    try:
+        with open(os.path.join(_DIR, ".env"), encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                os.environ.setdefault(k.strip(), v.strip())
+    except FileNotFoundError:
+        pass
+
+
+_load_dotenv()
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS searches(
