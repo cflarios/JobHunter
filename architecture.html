@@ -172,12 +172,12 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
   <header>
     <div class="eyebrow">Mapa de arquitectura · auto-alojado en Raspberry Pi</div>
     <h1>Job<span class="dot">Hunter</span></h1>
-    <p class="thesis">Buscador personal de empleos remotos. Cada mediodía barre 10 bolsas de trabajo,
-    filtra por rol, zona y frescura, guarda lo nuevo y te avisa. Con IA (Gemini): resume la reputación
-    de cada empresa y empareja tu CV con las ofertas (afinidad, ¿encajo?, carta, mejora de CV).
-    Enfocado en DevOps/SRE remoto desde Colombia, ampliable a cualquier rol.</p>
+    <p class="thesis">Buscador personal de empleos remotos. Cada mediodía barre 11 bolsas de trabajo
+    (10 públicas + LinkedIn vía RapidAPI), filtra por rol, zona y frescura, guarda lo nuevo y te avisa.
+    Con IA (Gemini): resume la reputación de cada empresa y empareja tu CV con las ofertas (afinidad,
+    ¿encajo?, carta, mejora de CV). Enfocado en DevOps/SRE remoto desde Colombia, ampliable a cualquier rol.</p>
     <div class="chips">
-      <div class="chip"><div class="n">10</div><div class="l">Fuentes</div></div>
+      <div class="chip"><div class="n">11</div><div class="l">Fuentes</div></div>
       <div class="chip"><div class="n">7</div><div class="l">Tablas SQLite</div></div>
       <div class="chip"><div class="n">22</div><div class="l">Rutas HTTP</div></div>
       <div class="chip"><div class="n">~1.7k</div><div class="l">Líneas de código</div></div>
@@ -232,7 +232,7 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
       <div class="stage" data-c="blue">
         <div class="num">03</div>
         <div class="stage-card">
-          <div class="stage-head"><span class="stage-title">10 Fuentes</span><span class="stage-tag">API / RSS · sin key</span></div>
+          <div class="stage-head"><span class="stage-title">11 Fuentes</span><span class="stage-tag">10 sin key + RapidAPI</span></div>
           <div class="nodes">
             <div class="node"><b>Remotive</b></div><div class="node"><b>RemoteOK</b></div>
             <div class="node"><b>Jobicy</b></div><div class="node"><b>Himalayas</b></div>
@@ -240,6 +240,7 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
             <div class="node"><b>The Muse</b></div><div class="node"><b>Working Nomads</b></div>
             <div class="node"><b>Landing.jobs</b><span class="d">incluye salario</span></div>
             <div class="node"><b>Get on Board</b><span class="d">LATAM · salario USD</span></div>
+            <div class="node" style="border-color:var(--amber)"><b style="color:var(--amber)">LinkedIn</b><span class="d">vía RapidAPI · salario, modalidad, skills</span></div>
           </div>
         </div>
       </div>
@@ -375,7 +376,9 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
       <div class="src"><div class="name">Working Nomads</div><div class="type">API JSON</div><div class="desc">todas las categorías</div></div>
       <div class="src"><div class="name">Landing.jobs</div><div class="type">API JSON</div><div class="desc">incluye rango salarial</div></div>
       <div class="src"><div class="name">Get on Board</div><div class="type">API JSON v0</div><div class="desc">LATAM · salario en USD</div></div>
+      <div class="src" style="border-color:var(--amber)"><div class="name">LinkedIn</div><div class="type" style="color:var(--amber)">RapidAPI</div><div class="desc">active-jb · salario, modalidad, skills · requiere RAPIDAPI_KEY</div></div>
     </div>
+    <p class="muted" style="font-size:12.5px;margin-top:12px">RapidAPI: helper genérico <span class="mono">_rapidapi_get(host, path, params)</span> en fetcher.py — añadir otra API de RapidAPI es escribir <span class="mono">fetch_x()</span> y sumarla a <span class="mono">SOURCES</span>.</p>
   </section>
 
   <section class="blk">
@@ -402,8 +405,8 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
   <section class="blk">
     <h2 class="sec">Seguridad y datos</h2>
     <ul class="list sec-list">
-      <li><b>Sin secretos en el repo.</b> GEMINI_API_KEY vive en un override de systemd propiedad de root (600), no en el código.</li>
-      <li><b>.gitignore</b> excluye <span class="mono">.venv/</span>, <span class="mono">jobs.db*</span>, <span class="mono">*.log</span> y <span class="mono">apikey.conf</span>.</li>
+      <li><b>Sin secretos en el repo.</b> <span class="mono">GEMINI_API_KEY</span> y <span class="mono">RAPIDAPI_KEY</span> viven en un <span class="mono">.env</span> (600, no versionado); systemd lo carga con <span class="mono">EnvironmentFile</span> y <span class="mono">db.py</span> como respaldo.</li>
+      <li><b>.gitignore</b> excluye <span class="mono">.venv/</span>, <span class="mono">jobs.db*</span>, <span class="mono">*.log</span> y <span class="mono">.env</span> (se versiona <span class="mono">.env.example</span>).</li>
       <li><b>Render seguro.</b> Los resúmenes de Gemini pasan por un filtro Markdown que escapa HTML antes de mostrarse.</li>
       <li><b>Solo lectura pública.</b> La app corre en la LAN; el timer recupera corridas perdidas con Persistent=true.</li>
     </ul>
@@ -428,10 +431,10 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
   "host": "Raspberry Pi (Debian 13, Python 3.13) — http://192.168.1.11:8080",
   "stack": ["Python 3.13", "Flask", "SQLite (WAL)", "systemd", "Gemini API"],
   "metrics": {
-    "sources": 10,
+    "sources": 11,
     "db_tables": 7,
     "http_routes": 22,
-    "python_lines": 1652,
+    "python_lines": 1720,
     "template_files": 8,
     "systemd_units": 3,
     "ai_features": 2
@@ -453,12 +456,12 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
       "components": [
         { "name": "run_search.sh", "detail": "wrapper del cron; registra en search.log" },
         { "name": "fetcher.run_all()", "detail": "recorre búsquedas activas y aplica ventana/modo por búsqueda" },
-        { "name": "fetcher.run_search()", "detail": "consulta las 10 fuentes, filtra, deduplica, inserta y notifica" }
+        { "name": "fetcher.run_search()", "detail": "consulta las 11 fuentes, filtra, deduplica, inserta y notifica" }
       ]
     },
     {
       "id": "sources",
-      "name": "Fuentes (API / RSS público, sin key)",
+      "name": "Fuentes (11): 10 públicas sin key + LinkedIn vía RapidAPI",
       "color": "blue",
       "components": [
         { "name": "Remotive", "detail": "API JSON, search=query" },
@@ -470,7 +473,8 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
         { "name": "The Muse", "detail": "API JSON, location=Flexible/Remote" },
         { "name": "Working Nomads", "detail": "API JSON" },
         { "name": "Landing.jobs", "detail": "API JSON (incluye salario)" },
-        { "name": "Get on Board", "detail": "API JSON /api/v0 (LATAM, salario USD); empresa vía /companies/{id}" }
+        { "name": "Get on Board", "detail": "API JSON /api/v0 (LATAM, salario USD); empresa vía /companies/{id}" },
+        { "name": "LinkedIn (RapidAPI)", "detail": "linkedin-job-search-api /active-jb; salario, modalidad y skills. Helper genérico _rapidapi_get() para más APIs de RapidAPI. Requiere RAPIDAPI_KEY" }
       ]
     },
     {
@@ -529,7 +533,7 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
   ],
   "data_flow": [
     "Timer 12:00 (o Usuario) → run_search.sh → fetcher.run_all()",
-    "run_search() → 10 fuentes (HTTP) → filtros (título, ubicación, fecha, dedup)",
+    "run_search() → 11 fuentes (HTTP; LinkedIn vía RapidAPI) → filtros (título, ubicación, fecha, dedup)",
     "→ INSERT OR IGNORE en jobs + INSERT notificación si hay nuevos",
     "Flask lee jobs.db → renderiza Empleos/Compañías/Mi CV/Notificaciones",
     "Navegador sondea /api/jobs-status (45s) y /api/unread (30s) para avisar sin recargar",
@@ -573,7 +577,7 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
   },
   "files": [
     { "file": "db.py", "role": "Esquema y helpers de SQLite (7 tablas)" },
-    { "file": "fetcher.py", "role": "10 fuentes, filtros (título/ubicación/fecha), orquestación" },
+    { "file": "fetcher.py", "role": "11 fuentes (10 públicas + LinkedIn RapidAPI), helper _rapidapi_get, filtros, orquestación" },
     { "file": "app.py", "role": "Servidor Flask, 22 rutas, filtro Markdown, favicon, mapas" },
     { "file": "reviews.py", "role": "Resumen de opiniones de empresas vía Gemini + grounding" },
     { "file": "cv.py", "role": "CV + IA: analizar, match, ¿encajo?, carta, mejora (Gemini)" },
@@ -582,9 +586,9 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
     { "file": "deploy/", "role": "Unidades systemd (referencia)" }
   ],
   "security": [
-    "Sin secretos en el repo: GEMINI_API_KEY vive en /etc/systemd/system/jobhunter-web.service.d/apikey.conf (root, 600)",
+    "Sin secretos en el repo: GEMINI_API_KEY y RAPIDAPI_KEY viven en .env (600, gitignored). systemd los carga con EnvironmentFile; db.py como fallback",
     "El CV se guarda solo en la Pi (tablas profile/job_matches); 'Borrar perfil' lo elimina",
-    ".gitignore excluye .venv/, jobs.db*, *.log, apikey.conf",
+    ".gitignore excluye .venv/, jobs.db*, *.log, .env (se versiona .env.example)",
     "Filtro Markdown escapa HTML antes de renderizar resúmenes y análisis"
   ]
 }

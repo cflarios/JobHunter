@@ -5,10 +5,10 @@
   "host": "Raspberry Pi (Debian 13, Python 3.13) — http://192.168.1.11:8080",
   "stack": ["Python 3.13", "Flask", "SQLite (WAL)", "systemd", "Gemini API"],
   "metrics": {
-    "sources": 10,
+    "sources": 11,
     "db_tables": 7,
     "http_routes": 22,
-    "python_lines": 1652,
+    "python_lines": 1720,
     "template_files": 8,
     "systemd_units": 3,
     "ai_features": 2
@@ -30,12 +30,12 @@
       "components": [
         { "name": "run_search.sh", "detail": "wrapper del cron; registra en search.log" },
         { "name": "fetcher.run_all()", "detail": "recorre búsquedas activas y aplica ventana/modo por búsqueda" },
-        { "name": "fetcher.run_search()", "detail": "consulta las 10 fuentes, filtra, deduplica, inserta y notifica" }
+        { "name": "fetcher.run_search()", "detail": "consulta las 11 fuentes, filtra, deduplica, inserta y notifica" }
       ]
     },
     {
       "id": "sources",
-      "name": "Fuentes (API / RSS público, sin key)",
+      "name": "Fuentes (11): 10 públicas sin key + LinkedIn vía RapidAPI",
       "color": "blue",
       "components": [
         { "name": "Remotive", "detail": "API JSON, search=query" },
@@ -47,7 +47,8 @@
         { "name": "The Muse", "detail": "API JSON, location=Flexible/Remote" },
         { "name": "Working Nomads", "detail": "API JSON" },
         { "name": "Landing.jobs", "detail": "API JSON (incluye salario)" },
-        { "name": "Get on Board", "detail": "API JSON /api/v0 (LATAM, salario USD); empresa vía /companies/{id}" }
+        { "name": "Get on Board", "detail": "API JSON /api/v0 (LATAM, salario USD); empresa vía /companies/{id}" },
+        { "name": "LinkedIn (RapidAPI)", "detail": "linkedin-job-search-api /active-jb; salario, modalidad y skills. Helper genérico _rapidapi_get() para más APIs de RapidAPI. Requiere RAPIDAPI_KEY" }
       ]
     },
     {
@@ -106,7 +107,7 @@
   ],
   "data_flow": [
     "Timer 12:00 (o Usuario) → run_search.sh → fetcher.run_all()",
-    "run_search() → 10 fuentes (HTTP) → filtros (título, ubicación, fecha, dedup)",
+    "run_search() → 11 fuentes (HTTP; LinkedIn vía RapidAPI) → filtros (título, ubicación, fecha, dedup)",
     "→ INSERT OR IGNORE en jobs + INSERT notificación si hay nuevos",
     "Flask lee jobs.db → renderiza Empleos/Compañías/Mi CV/Notificaciones",
     "Navegador sondea /api/jobs-status (45s) y /api/unread (30s) para avisar sin recargar",
@@ -150,7 +151,7 @@
   },
   "files": [
     { "file": "db.py", "role": "Esquema y helpers de SQLite (7 tablas)" },
-    { "file": "fetcher.py", "role": "10 fuentes, filtros (título/ubicación/fecha), orquestación" },
+    { "file": "fetcher.py", "role": "11 fuentes (10 públicas + LinkedIn RapidAPI), helper _rapidapi_get, filtros, orquestación" },
     { "file": "app.py", "role": "Servidor Flask, 22 rutas, filtro Markdown, favicon, mapas" },
     { "file": "reviews.py", "role": "Resumen de opiniones de empresas vía Gemini + grounding" },
     { "file": "cv.py", "role": "CV + IA: analizar, match, ¿encajo?, carta, mejora (Gemini)" },
@@ -159,9 +160,9 @@
     { "file": "deploy/", "role": "Unidades systemd (referencia)" }
   ],
   "security": [
-    "Sin secretos en el repo: GEMINI_API_KEY vive en /etc/systemd/system/jobhunter-web.service.d/apikey.conf (root, 600)",
+    "Sin secretos en el repo: GEMINI_API_KEY y RAPIDAPI_KEY viven en .env (600, gitignored). systemd los carga con EnvironmentFile; db.py como fallback",
     "El CV se guarda solo en la Pi (tablas profile/job_matches); 'Borrar perfil' lo elimina",
-    ".gitignore excluye .venv/, jobs.db*, *.log, apikey.conf",
+    ".gitignore excluye .venv/, jobs.db*, *.log, .env (se versiona .env.example)",
     "Filtro Markdown escapa HTML antes de renderizar resúmenes y análisis"
   ]
 }
