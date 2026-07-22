@@ -492,9 +492,74 @@ def fetch_landingjobs(query):
     return out
 
 
+_GOB_COMPANY_CACHE = {}
+
+
+def _gob_company(cid):
+    """Resuelve el nombre de empresa de Get on Board (con caché y tope de llamadas)."""
+    if cid in _GOB_COMPANY_CACHE:
+        return _GOB_COMPANY_CACHE[cid]
+    if len(_GOB_COMPANY_CACHE) >= 15:   # acota latencia añadida
+        return None
+    name = None
+    try:
+        r = requests.get(f"https://www.getonbrd.com/api/v0/companies/{cid}",
+                         headers=HEADERS, timeout=10)
+        if r.ok:
+            name = (r.json().get("data", {}).get("attributes", {}) or {}).get("name")
+    except Exception:
+        name = None
+    _GOB_COMPANY_CACHE[cid] = name
+    return name
+
+
+def fetch_getonbrd(query):
+    """Get on Board: API pública JSON (LATAM, con salario en USD, sin key)."""
+    out = []
+    try:
+        r = requests.get(
+            "https://www.getonbrd.com/api/v0/search/jobs",
+            params={"query": query, "per_page": 40}, headers=HEADERS, timeout=TIMEOUT,
+        )
+        r.raise_for_status()
+        rows = r.json().get("data", [])
+        for j in rows:
+            a = j.get("attributes", {}) or {}
+            comp = a.get("company")
+            cid = comp.get("data", {}).get("id") if isinstance(comp, dict) else None
+            # Solo resolvemos empresa si el título parece del rol (evita llamadas de más).
+            title = a.get("title", "")
+            relevant = any(t in title.lower() for t in query.lower().split())
+            company = _gob_company(cid) if (cid and relevant) else None
+            lo, hi = a.get("min_salary"), a.get("max_salary")
+            sal = ""
+            if lo and hi:
+                try:
+                    sal = f"USD {int(lo):,} - {int(hi):,}"
+                except (TypeError, ValueError):
+                    sal = ""
+            countries = [c for c in (a.get("countries") or []) if c and c != "Remote"]
+            is_remote = a.get("remote") in (True, "True", "true") or a.get("remote_modality") == "remote"
+            parts = (["Remote"] if is_remote else []) + countries
+            loc = " · ".join(dict.fromkeys(parts)) or "Remote"
+            out.append({
+                "title": title,
+                "company": company,
+                "url": (j.get("links") or {}).get("public_url"),
+                "source": "Get on Board",
+                "salary": sal,
+                "location": loc,
+                "posted_ts": _to_ts(a.get("published_at")),
+                "_text": f"{title} {a.get('category_name','')}",
+            })
+    except Exception as e:
+        print("  [Get on Board] error:", e)
+    return out
+
+
 SOURCES = [fetch_remotive, fetch_remoteok, fetch_jobicy, fetch_himalayas,
            fetch_wwr, fetch_arbeitnow, fetch_themuse, fetch_workingnomads,
-           fetch_landingjobs]
+           fetch_landingjobs, fetch_getonbrd]
 
 
 # --------------------------------------------------------------------------- #

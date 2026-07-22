@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Mi CV · JobHunter{% endblock %}
+{% block body %}
+
+<div class="row" style="justify-content:space-between;margin-bottom:6px">
+  <h2 style="margin:0">Mi CV + IA</h2>
+  {% if profile %}
+  <form method="post" action="{{ url_for('cv_clear') }}"
+        onsubmit="return confirm('¿Borrar tu perfil y las afinidades calculadas?')">
+    <button class="btn ghost sm" type="submit">Borrar perfil</button>
+  </form>
+  {% endif %}
+</div>
+<p class="muted" style="margin-top:0">Sube tu CV y la IA extrae tu perfil, puntúa cada empleo por afinidad, analiza si encajas y mejora tu currículum. Tu CV se guarda <b>solo en esta Raspberry Pi</b>.</p>
+
+<div class="card">
+  <h3 style="margin-top:0">{{ 'Actualizar CV' if profile else 'Analizar mi CV' }}</h3>
+  <form method="post" action="{{ url_for('cv_analyze') }}" enctype="multipart/form-data" class="cv-form">
+    <textarea name="cv_text" rows="7" placeholder="Pega aquí el texto de tu CV…"
+      style="width:100%;background:var(--card2);border:1px solid var(--line);color:var(--txt);
+      border-radius:8px;padding:10px;font:inherit;resize:vertical"></textarea>
+    <div class="row" style="margin-top:10px;align-items:center">
+      <span class="muted" style="font-size:13px">…o sube un PDF:</span>
+      <input type="file" name="cv_file" accept="application/pdf,.pdf,.txt"
+        style="font-size:13px;color:var(--mut)">
+      <button class="btn" type="submit" style="margin-left:auto">Analizar con IA</button>
+    </div>
+  </form>
+</div>
+
+{% if profile %}
+<div class="card">
+  <h3 style="margin-top:0">Tu perfil</h3>
+  <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr))">
+    <div class="stat"><div class="l">Rol</div><div style="font-weight:600;margin-top:3px">{{ profile.role or '—' }}</div></div>
+    <div class="stat"><div class="l">Seniority</div><div style="font-weight:600;margin-top:3px">{{ profile.seniority or '—' }}</div></div>
+    <div class="stat"><div class="l">Experiencia</div><div style="font-weight:600;margin-top:3px">{{ profile.years or '—' }} años</div></div>
+  </div>
+  {% if profile.skills %}<div style="margin-top:12px"><span class="muted" style="font-size:12px">SKILLS</span><br>
+    {% for s in profile.skills.split(',') %}<span class="pill" style="margin:3px 3px 0 0">{{ s.strip() }}</span>{% endfor %}
+  </div>{% endif %}
+  {% if profile.summary %}<p class="muted" style="margin:12px 0 0">{{ profile.summary }}</p>{% endif %}
+
+  {% if profile.suggested_keywords %}
+  <div class="row" style="margin-top:14px;align-items:center;gap:10px;flex-wrap:wrap">
+    <span class="muted" style="font-size:13px">Palabras clave sugeridas para buscar:</span>
+    <span class="mono" style="color:var(--accent)">{{ profile.suggested_keywords }}</span>
+    <form method="post" action="{{ url_for('cv_apply_keywords') }}">
+      <button class="btn sm ghost" type="submit">Aplicar a mi búsqueda activa</button>
+    </form>
+  </div>
+  {% endif %}
+
+  <div class="row" style="margin-top:16px;gap:10px">
+    <form method="post" action="{{ url_for('cv_match') }}" class="cv-form">
+      <button class="btn green" type="submit">✦ Analizar afinidad de mis {{ n_jobs }} empleos</button>
+    </form>
+    <form method="post" action="{{ url_for('cv_improve') }}" class="cv-form">
+      <button class="btn" type="submit">↑ Mejorar mi CV (Harvard/ATS)</button>
+    </form>
+  </div>
+  {% if n_matches %}<p class="muted" style="font-size:12.5px;margin:10px 0 0">{{ n_matches }} empleo(s) con afinidad calculada — míralos ordenados en <a href="{{ url_for('index', sort='match') }}">Empleos</a>.</p>{% endif %}
+</div>
+
+{% if profile.feedback or profile.rewrite %}
+<div class="card">
+  <h3 style="margin-top:0">Mejora de CV con IA</h3>
+  {% if profile.feedback %}<div style="margin-bottom:14px"><span class="muted" style="font-size:12px">RECOMENDACIONES (Harvard / ATS)</span>{{ profile.feedback|md }}</div>{% endif %}
+  {% if profile.rewrite %}<div style="padding:12px 14px;background:var(--card2);border-radius:10px;border-left:3px solid var(--accent2)"><span class="muted" style="font-size:12px">RESUMEN Y LOGROS REESCRITOS</span>{{ profile.rewrite|md }}</div>{% endif %}
+  <div class="muted" style="font-size:11px;margin-top:10px">Generado por Gemini · edítalo a tu criterio</div>
+</div>
+{% endif %}
+{% endif %}
+
+<script>
+document.querySelectorAll('form.cv-form').forEach(function(f){
+  f.addEventListener('submit',function(){
+    var b=f.querySelector('button[type=submit]');
+    if(b && !b.disabled){ b.disabled=true; b.innerHTML='<span class="spinner"></span>Procesando…'; }
+  });
+});
+</script>
+{% endblock %}

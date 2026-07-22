@@ -43,6 +43,26 @@ CREATE TABLE IF NOT EXISTS company_reviews(
     status        TEXT DEFAULT 'ok',
     generated_at  TEXT DEFAULT (datetime('now','localtime'))
 );
+CREATE TABLE IF NOT EXISTS profile(
+    id                 INTEGER PRIMARY KEY CHECK (id = 1),
+    cv_text            TEXT,
+    role               TEXT,
+    seniority          TEXT,
+    years              TEXT,
+    skills             TEXT,
+    summary            TEXT,
+    suggested_keywords TEXT,
+    feedback           TEXT,
+    rewrite            TEXT,
+    updated_at         TEXT DEFAULT (datetime('now','localtime'))
+);
+CREATE TABLE IF NOT EXISTS job_matches(
+    job_id     INTEGER PRIMARY KEY REFERENCES jobs(id) ON DELETE CASCADE,
+    score      INTEGER,
+    reason     TEXT,
+    fit_detail TEXT,
+    updated_at TEXT DEFAULT (datetime('now','localtime'))
+);
 CREATE INDEX IF NOT EXISTS idx_jobs_posted ON jobs(posted_ts DESC);
 """
 

@@ -35,9 +35,21 @@ Sin la key, el enlace a Glassdoor funciona igual; solo el resumen automático qu
 deshabilitado (con un aviso). Obtén una key gratis en https://aistudio.google.com/apikey
 Para cambiar de modelo, edita `MODEL` en `reviews.py`.
 
-## Fuentes (API/RSS público, sin API key) — 9
+## Fuentes (API/RSS público, sin API key) — 10
 Remotive · RemoteOK · Jobicy · Himalayas · WeWorkRemotely (DevOps + Programming) ·
-Arbeitnow · The Muse · Working Nomads · Landing.jobs (con salario)
+Arbeitnow · The Muse · Working Nomads · Landing.jobs (con salario) ·
+Get on Board (LATAM, con salario en USD)
+
+## Mi CV + IA (Gemini) — pestaña "Mi CV"
+Sube tu CV (PDF o texto pegado) y Gemini:
+- extrae tu **perfil** (rol, seniority, años, skills) y sugiere palabras clave de título;
+- puntúa cada empleo por **afinidad 0–100** (badge y orden en la pestaña Empleos);
+- **"¿Encajo aquí?"** por oferta: coincidencias, gaps y qué resaltar;
+- **carta de presentación** a medida por oferta;
+- **mejora tu CV** (estilo Harvard/ATS): recomendaciones + resumen y logros reescritos.
+
+El CV se guarda **solo en la Pi** (tablas `profile` y `job_matches`); "Borrar perfil"
+lo elimina. Usa la misma `GEMINI_API_KEY` que los resúmenes de empresas.
 
 Para añadir una fuente: crear una función `fetch_x(query)` en `fetcher.py` que
 devuelva dicts con las claves title/company/url/source/salary/location/posted_ts,

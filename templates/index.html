@@ -52,6 +52,21 @@
     </form>
     {% endif %}
   </div>
+  {% if has_profile %}
+  <div class="row" style="margin-top:12px;gap:10px;align-items:center">
+    <span class="muted" style="font-size:13px">Ordenar:</span>
+    <a class="btn sm {{ 'ghost' if f_sort=='match' }}" href="{{ url_for('index') }}">Recientes</a>
+    <a class="btn sm {{ '' if f_sort=='match' else 'ghost' }}" href="{{ url_for('index', sort='match') }}">Afinidad ✦</a>
+    <span class="muted" style="font-size:12px">{{ n_matches }} con afinidad</span>
+    <form method="post" action="{{ url_for('cv_match') }}" class="cv-form" style="margin-left:auto">
+      <button class="btn sm" type="submit">↻ Recalcular afinidad</button>
+    </form>
+  </div>
+  {% else %}
+  <div class="row" style="margin-top:12px">
+    <a class="btn sm" href="{{ url_for('cv_page') }}">✦ Sube tu CV para ver tu afinidad con cada empleo →</a>
+  </div>
+  {% endif %}
 </div>
 
 <p class="muted">{{ jobs|length }} empleo(s) mostrados.</p>
@@ -68,14 +83,28 @@
         {{ j.company or 'Empresa no indicada' }} · {{ j.location or 'Remote' }}
       </div>
       <div class="row">
+        {% if j.match_score is not none %}
+          {% set mc = 'var(--accent2)' if j.match_score>=80 else ('var(--accent)' if j.match_score>=60 else 'var(--warn)') %}
+          <span class="pill" style="color:{{ mc }};border-color:{{ mc }};font-weight:700">✦ {{ j.match_score }}% afinidad</span>
+        {% endif %}
         <span class="pill">📍 {{ j.source }}</span>
         {% if j.salary %}<span class="pill" style="color:var(--accent2)">💰 {{ j.salary }}</span>
         {% else %}<span class="pill">💰 no indicado</span>{% endif %}
         <span class="pill">🗓 {{ j.date_posted or '—' }} ({{ j.posted_ts|ago }})</span>
         {% if j.squery %}<span class="pill">🔎 {{ j.squery }}</span>{% endif %}
       </div>
+      {% if j.match_reason %}<div class="muted" style="font-size:12.5px;margin-top:6px">✦ {{ j.match_reason }}</div>{% endif %}
     </div>
-    <a class="btn sm" href="{{ j.url }}" target="_blank" rel="noopener">Ver oferta →</a>
+    <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;min-width:120px">
+      <a class="btn sm" href="{{ j.url }}" target="_blank" rel="noopener">Ver oferta →</a>
+      {% if has_profile %}
+      <button class="btn sm ghost fit-btn" data-id="{{ j.id }}">¿Encajo aquí?</button>
+      <button class="btn sm ghost cover-btn" data-id="{{ j.id }}">✉ Carta</button>
+      {% endif %}
+    </div>
+  </div>
+  <div class="fit-slot" id="fit-{{ j.id }}">
+    {% if j.fit_detail %}{% with detail=j.fit_detail %}{% include '_fitblock.html' %}{% endwith %}{% endif %}
   </div>
 </div>
 {% else %}
@@ -104,6 +133,50 @@
   }
   check();
   setInterval(check, 45000);   // revisa cada 45 s
+})();
+
+// --- CV + IA: ¿Encajo aquí? y Carta (AJAX con spinner) ---
+(function(){
+  function spin(b,l){ b.disabled=true; b.dataset.o=b.textContent; b.innerHTML='<span class="spinner"></span>'+l; }
+  function unspin(b){ b.disabled=false; if(b.dataset.o!==undefined) b.textContent=b.dataset.o; }
+  document.querySelectorAll('.fit-btn').forEach(function(b){
+    b.addEventListener('click',function(){
+      var id=b.dataset.id, slot=document.getElementById('fit-'+id);
+      spin(b,'Analizando…');
+      fetch('/jobs/'+id+'/fit',{method:'POST',headers:{'X-Requested-With':'fetch'}})
+        .then(function(r){return r.json();}).then(function(d){
+          unspin(b);
+          slot.innerHTML = d.ok ? d.html
+            : '<div class="muted" style="margin-top:8px">No se pudo analizar. Reintenta.</div>';
+        }).catch(function(){ unspin(b); });
+    });
+  });
+  document.querySelectorAll('.cover-btn').forEach(function(b){
+    b.addEventListener('click',function(){
+      var id=b.dataset.id, slot=document.getElementById('fit-'+id);
+      spin(b,'Redactando…');
+      fetch('/jobs/'+id+'/cover',{method:'POST',headers:{'X-Requested-With':'fetch'}})
+        .then(function(r){return r.json();}).then(function(d){
+          unspin(b);
+          if(!d.ok) return;
+          var box=document.createElement('div');
+          box.style.cssText='margin-top:8px;padding:12px 14px;background:var(--card2);border-radius:10px;border-left:3px solid var(--accent2)';
+          var lbl=document.createElement('div'); lbl.className='muted'; lbl.style.fontSize='11px';
+          lbl.textContent='Carta de presentación · Gemini (edítala antes de enviar)';
+          var ta=document.createElement('textarea');
+          ta.style.cssText='width:100%;height:160px;margin-top:6px;background:var(--card);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit;resize:vertical';
+          ta.value=d.text;
+          box.appendChild(lbl); box.appendChild(ta); slot.appendChild(box);
+        }).catch(function(){ unspin(b); });
+    });
+  });
+  // spinner al recalcular afinidad (POST síncrono largo)
+  document.querySelectorAll('form.cv-form').forEach(function(f){
+    f.addEventListener('submit',function(){
+      var b=f.querySelector('button');
+      if(b){ b.disabled=true; b.innerHTML='<span class="spinner"></span>Calculando…'; }
+    });
+  });
 })();
 </script>
 {% endblock %}

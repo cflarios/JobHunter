@@ -9,6 +9,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 from db import get_db, init_db, get_setting, set_setting
 from fetcher import run_all
 from reviews import generate_company_summary
+import cv as cvai
 
 app = Flask(__name__)
 app.secret_key = "job-hunter-local-secret"
@@ -58,9 +59,13 @@ def index():
     source = request.args.get("source", "").strip()
     active_search = request.args.get("search", "").strip()
     days = request.args.get("days", "").strip()
+    sort = request.args.get("sort", "").strip()
 
-    sql = """SELECT j.*, s.query AS squery FROM jobs j
-             LEFT JOIN searches s ON s.id=j.search_id WHERE 1=1"""
+    sql = """SELECT j.*, s.query AS squery, m.score AS match_score, m.reason AS match_reason,
+                    m.fit_detail AS fit_detail
+             FROM jobs j
+             LEFT JOIN searches s ON s.id=j.search_id
+             LEFT JOIN job_matches m ON m.job_id=j.id WHERE 1=1"""
     params = []
     if q:
         sql += " AND (j.title LIKE ? OR j.company LIKE ?)"
@@ -75,8 +80,13 @@ def index():
         cutoff = int(dt.datetime.now(dt.timezone.utc).timestamp()) - int(days) * 86400
         sql += " AND j.posted_ts >= ?"
         params.append(cutoff)
-    sql += " ORDER BY j.posted_ts DESC, j.found_at DESC"
+    if sort == "match":
+        sql += " ORDER BY (m.score IS NULL), m.score DESC, j.posted_ts DESC"
+    else:
+        sql += " ORDER BY j.posted_ts DESC, j.found_at DESC"
     jobs = con.execute(sql, params).fetchall()
+    has_profile = con.execute("SELECT 1 FROM profile WHERE id=1").fetchone() is not None
+    n_matches = con.execute("SELECT COUNT(*) c FROM job_matches").fetchone()["c"]
 
     searches = con.execute(
         "SELECT * FROM searches ORDER BY active DESC, id").fetchall()
@@ -94,7 +104,8 @@ def index():
     return render_template("index.html", jobs=jobs, searches=searches,
                            sources=sources, unread=unread, stats=stats,
                            f_q=q, f_source=source, f_search=active_search,
-                           f_days=days)
+                           f_days=days, f_sort=sort, has_profile=has_profile,
+                           n_matches=n_matches)
 
 
 @app.route("/mark-seen", methods=["POST"])
@@ -274,6 +285,178 @@ def company_glassdoor_name():
         con.close()
         flash(f"Nombre de Glassdoor de «{company}» actualizado.", "ok")
     return redirect(url_for("companies") + f"#c-{quote_plus(company)}")
+
+
+def _load_profile(con):
+    row = con.execute("SELECT * FROM profile WHERE id=1").fetchone()
+    return dict(row) if row else None
+
+
+@app.route("/cv")
+def cv_page():
+    con = get_db()
+    profile = _load_profile(con)
+    n_jobs = con.execute("SELECT COUNT(*) c FROM jobs").fetchone()["c"]
+    n_matches = con.execute("SELECT COUNT(*) c FROM job_matches").fetchone()["c"]
+    con.close()
+    return render_template("cv.html", profile=profile, n_jobs=n_jobs, n_matches=n_matches)
+
+
+@app.route("/cv/analyze", methods=["POST"])
+def cv_analyze():
+    import base64
+    text = request.form.get("cv_text", "").strip()
+    pdf_b64 = None
+    f = request.files.get("cv_file")
+    if f and f.filename:
+        data = f.read(6 * 1024 * 1024)  # tope 6 MB
+        if f.filename.lower().endswith(".pdf") or (f.mimetype or "").endswith("pdf"):
+            pdf_b64 = base64.standard_b64encode(data).decode()
+        else:
+            try:
+                text = text or data.decode("utf-8", "ignore")
+            except Exception:
+                text = text
+    if not text and not pdf_b64:
+        flash("Pega el texto de tu CV o sube un PDF.", "ok")
+        return redirect(url_for("cv_page"))
+
+    res = cvai.analyze_cv(text=text or None, pdf_b64=pdf_b64)
+    con = get_db()
+    if res.get("ok"):
+        con.execute(
+            """INSERT INTO profile(id,cv_text,role,seniority,years,skills,summary,
+                 suggested_keywords,updated_at)
+               VALUES(1,?,?,?,?,?,?,?,datetime('now','localtime'))
+               ON CONFLICT(id) DO UPDATE SET cv_text=excluded.cv_text,role=excluded.role,
+                 seniority=excluded.seniority,years=excluded.years,skills=excluded.skills,
+                 summary=excluded.summary,suggested_keywords=excluded.suggested_keywords,
+                 feedback=NULL,rewrite=NULL,updated_at=excluded.updated_at""",
+            (text[:20000] if text else None, res["role"], res["seniority"], res["years"],
+             res["skills"], res["summary"], res["suggested_keywords"]))
+        con.commit()
+        flash("Perfil analizado. Ya puedes calcular la afinidad de tus empleos.", "ok")
+    else:
+        flash("No se pudo analizar el CV: " + res.get("error", ""), "ok")
+    con.close()
+    return redirect(url_for("cv_page"))
+
+
+@app.route("/cv/apply-keywords", methods=["POST"])
+def cv_apply_keywords():
+    con = get_db()
+    p = _load_profile(con)
+    kw = (p or {}).get("suggested_keywords")
+    if kw:
+        row = con.execute(
+            "SELECT id FROM searches WHERE active=1 ORDER BY id LIMIT 1").fetchone()
+        if row:
+            con.execute("UPDATE searches SET title_keywords=? WHERE id=?", (kw, row["id"]))
+            con.commit()
+            flash(f"Palabras clave aplicadas a tu búsqueda activa: {kw}", "ok")
+        else:
+            flash("No hay una búsqueda activa a la que aplicarlas.", "ok")
+    con.close()
+    return redirect(url_for("cv_page"))
+
+
+@app.route("/cv/match", methods=["POST"])
+def cv_match():
+    con = get_db()
+    p = _load_profile(con)
+    if not p:
+        con.close()
+        flash("Primero analiza tu CV.", "ok")
+        return redirect(url_for("cv_page"))
+    jobs = [dict(r) for r in con.execute(
+        "SELECT id,title,company,location,salary FROM jobs").fetchall()]
+    total = 0
+    for i in range(0, len(jobs), 40):        # por lotes de 40
+        res = cvai.match_jobs(p, jobs[i:i + 40])
+        if not res.get("ok"):
+            con.close()
+            flash("Error al calcular afinidad: " + res.get("error", ""), "ok")
+            return redirect(url_for("cv_page"))
+        for m in res["matches"]:
+            con.execute(
+                """INSERT INTO job_matches(job_id,score,reason,updated_at)
+                   VALUES(?,?,?,datetime('now','localtime'))
+                   ON CONFLICT(job_id) DO UPDATE SET score=excluded.score,
+                     reason=excluded.reason,updated_at=excluded.updated_at""",
+                (m["id"], m["score"], m["reason"]))
+            total += 1
+    con.commit()
+    con.close()
+    flash(f"Afinidad calculada para {total} empleo(s).", "ok")
+    return redirect(url_for("index", sort="match"))
+
+
+@app.route("/cv/improve", methods=["POST"])
+def cv_improve():
+    con = get_db()
+    p = _load_profile(con)
+    if not p:
+        con.close()
+        flash("Primero analiza tu CV.", "ok")
+        return redirect(url_for("cv_page"))
+    res = cvai.improve_cv(p, cv_text=p.get("cv_text"))
+    if res.get("ok"):
+        con.execute("UPDATE profile SET feedback=?, rewrite=? WHERE id=1",
+                    (res["feedback"], res["rewrite"]))
+        con.commit()
+    else:
+        flash("No se pudo mejorar el CV: " + res.get("error", ""), "ok")
+    con.close()
+    return redirect(url_for("cv_page"))
+
+
+@app.route("/cv/clear", methods=["POST"])
+def cv_clear():
+    con = get_db()
+    con.execute("DELETE FROM profile")
+    con.execute("DELETE FROM job_matches")
+    con.commit()
+    con.close()
+    flash("Perfil y afinidades borrados.", "ok")
+    return redirect(url_for("cv_page"))
+
+
+@app.route("/jobs/<int:job_id>/fit", methods=["POST"])
+def job_fit(job_id):
+    con = get_db()
+    p = _load_profile(con)
+    job = con.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
+    if not p or not job:
+        con.close()
+        return jsonify(ok=False, error="Falta perfil o empleo"), 400
+    res = cvai.analyze_fit(p, dict(job))
+    if res.get("ok"):
+        con.execute(
+            """INSERT INTO job_matches(job_id,score,fit_detail,updated_at)
+               VALUES(?,?,?,datetime('now','localtime'))
+               ON CONFLICT(job_id) DO UPDATE SET score=COALESCE(excluded.score,job_matches.score),
+                 fit_detail=excluded.fit_detail,updated_at=excluded.updated_at""",
+            (job_id, res["score"], res["html"]))
+        con.commit()
+        con.close()
+        html = render_template("_fitblock.html", detail=res["html"])
+        return jsonify(ok=True, html=html, score=res["score"])
+    con.close()
+    return jsonify(ok=False, error=res.get("error", "")), 500
+
+
+@app.route("/jobs/<int:job_id>/cover", methods=["POST"])
+def job_cover(job_id):
+    con = get_db()
+    p = _load_profile(con)
+    job = con.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
+    con.close()
+    if not p or not job:
+        return jsonify(ok=False, error="Falta perfil o empleo"), 400
+    res = cvai.cover_letter(p, dict(job))
+    if res.get("ok"):
+        return jsonify(ok=True, text=res["text"])
+    return jsonify(ok=False, error=res.get("error", "")), 500
 
 
 FAVICON_SVG = (

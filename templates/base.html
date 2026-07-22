@@ -62,6 +62,7 @@ button[disabled]{opacity:.75;cursor:progress}
   <div class="brand">Job<span>Hunter</span></div>
   <a href="{{ url_for('index') }}" class="{{ 'active' if request.endpoint=='index' }}">Empleos</a>
   <a href="{{ url_for('companies') }}" class="{{ 'active' if request.endpoint=='companies' }}">Compañías</a>
+  <a href="{{ url_for('cv_page') }}" class="{{ 'active' if request.endpoint=='cv_page' }}">Mi CV</a>
   <a href="{{ url_for('searches') }}" class="{{ 'active' if request.endpoint=='searches' }}">Búsquedas</a>
   <a href="{{ url_for('notifications') }}" class="{{ 'active' if request.endpoint=='notifications' }}">
     Notificaciones<span id="notif-badge" class="badge" style="display:none"></span></a>
