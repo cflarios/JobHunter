@@ -642,9 +642,58 @@ def fetch_linkedin(query):
     return out
 
 
+def fetch_jsearch(query):
+    """JSearch vía RapidAPI (agrega Google for Jobs: LinkedIn, Indeed, Glassdoor…).
+
+    Requiere RAPIDAPI_KEY y que la suscripción exponga el endpoint /search.
+    """
+    out = []
+    data = _rapidapi_get(
+        "jsearch.p.rapidapi.com", "search",
+        {"query": query, "page": 1, "num_pages": 1,
+         "date_posted": "week", "remote_jobs_only": "true"},
+    )
+    if not isinstance(data, dict):
+        return out
+    for j in data.get("data", []) or []:
+        if not isinstance(j, dict):
+            continue
+        parts = [p for p in (j.get("job_city"), j.get("job_state"),
+                             j.get("job_country")) if p]
+        loc = ", ".join(parts)
+        if j.get("job_is_remote"):
+            loc = "Remote" + (f" · {loc}" if loc else "")
+        loc = loc or "—"
+        # Salario
+        lo, hi = j.get("job_min_salary"), j.get("job_max_salary")
+        cur = j.get("job_salary_currency") or ""
+        per = (j.get("job_salary_period") or "").lower()
+        sal = ""
+        if lo and hi:
+            try:
+                sal = f"{cur} {int(lo):,} - {int(hi):,}".strip()
+                if per:
+                    sal += f" / {per}"
+            except (TypeError, ValueError):
+                sal = ""
+        desc = (j.get("job_description") or "")[:400]
+        out.append({
+            "title": j.get("job_title"),
+            "company": j.get("employer_name"),
+            "url": j.get("job_apply_link") or j.get("job_google_link"),
+            "source": "JSearch",
+            "salary": sal,
+            "location": loc,
+            "posted_ts": _to_ts(j.get("job_posted_at_timestamp")
+                                or j.get("job_posted_at_datetime_utc")),
+            "_text": f"{j.get('job_title','')} {desc}",
+        })
+    return out
+
+
 SOURCES = [fetch_remotive, fetch_remoteok, fetch_jobicy, fetch_himalayas,
            fetch_wwr, fetch_arbeitnow, fetch_themuse, fetch_workingnomads,
-           fetch_landingjobs, fetch_getonbrd, fetch_linkedin]
+           fetch_landingjobs, fetch_getonbrd, fetch_linkedin, fetch_jsearch]
 
 
 # --------------------------------------------------------------------------- #

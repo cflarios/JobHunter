@@ -35,16 +35,20 @@ Sin la key, el enlace a Glassdoor funciona igual; solo el resumen automático qu
 deshabilitado (con un aviso). Obtén una key gratis en https://aistudio.google.com/apikey
 Para cambiar de modelo, edita `MODEL` en `reviews.py`.
 
-## Fuentes — 11
+## Fuentes — 12
 Sin API key (10): Remotive · RemoteOK · Jobicy · Himalayas · WeWorkRemotely
 (DevOps + Programming) · Arbeitnow · The Muse · Working Nomads · Landing.jobs
 (con salario) · Get on Board (LATAM, con salario en USD).
 
-Vía RapidAPI (con key): **LinkedIn** (`linkedin-job-search-api`) — LinkedIn tiene
-la API cerrada, así que se accede por RapidAPI. Aporta salario, modalidad
-(remoto/híbrido) y skills. Nota: los empleos de LinkedIn están muy geo-etiquetados;
-en modo de ubicación "mundial" rinden pocos (solo remotos abiertos / LATAM), y en
-modo "América" aparecen los US-remote.
+Vía RapidAPI (con `RAPIDAPI_KEY`):
+- **LinkedIn** (`linkedin-job-search-api`, endpoint `active-jb`) — salario,
+  modalidad y skills. Muy geo-etiquetado: en modo "mundial" rinde poco; usar modo
+  "América" para US-remote. El plan BASIC tiene **cuota mensual** limitada (al
+  agotarse, 429 → la fuente devuelve vacío sin romper).
+- **JSearch** (`jsearch.p.rapidapi.com`, endpoint `search`) — agrega Google for
+  Jobs (LinkedIn, Indeed, Glassdoor, ZipRecruiter…). Requiere que la suscripción
+  exponga el endpoint `/search` (los demás endpoints pueden estar activos antes;
+  si `/search` da 404, esperar la propagación o revisar el plan).
 
 ### RapidAPI (para añadir más APIs de esta plataforma)
 La key se guarda como `RAPIDAPI_KEY` en el override de systemd de **ambos**

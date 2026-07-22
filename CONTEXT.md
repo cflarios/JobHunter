@@ -101,7 +101,8 @@ Ver el detalle visual en `/architecture` y `/workflow`.
 | Working Nomads | API JSON | todas las categorías |
 | Landing.jobs | API JSON | incluye salario; usa códigos ISO de país (mapeados) |
 | Get on Board | API JSON v0 | LATAM, salario USD; empresa vía `/companies/{id}` (caché acotada) |
-| **LinkedIn** | **RapidAPI** | `linkedin-job-search-api` endpoint `active-jb`; salario/modalidad/skills |
+| **LinkedIn** | **RapidAPI** | `linkedin-job-search-api` endpoint `active-jb`; salario/modalidad/skills. Plan BASIC = cuota mensual limitada (429 al agotarse) |
+| **JSearch** | **RapidAPI** | `jsearch.p.rapidapi.com` endpoint `search` (agrega Google for Jobs). Requiere que la suscripción exponga `/search` |
 
 **Añadir una fuente pública:** escribir `fetch_x(query)` en `fetcher.py` que
 devuelva dicts con `title/company/url/source/salary/location/posted_ts` (+ `_text`
@@ -241,6 +242,13 @@ sudo systemctl restart jobhunter-web.service       # tras cambios en app/templat
 
 - **El usuario edita la config en vivo desde la web** (ventana, keywords, modo).
   **No pisar sus ajustes** sin preguntar (ver memoria `jobhunter-live-settings`).
+- **RapidAPI: cuotas y propagación.** El plan gratuito/BASIC tiene cuota mensual
+  (LinkedIn 429 al agotarse). Al suscribir una API nueva, algunos endpoints
+  responden antes que otros (JSearch: `/job-details` y `/estimated-salary`
+  funcionaron mientras `/search` daba 404 "endpoint does not exist"). Las fuentes
+  RapidAPI degradan a `[]` sin romper; se activan solas cuando la cuota/endpoint
+  resuelven. Verificar en la página de la API en RapidAPI que el endpoint usado
+  esté incluido en el plan suscrito.
 - **Filtro de ubicación = blocklist de países/regiones**: es "whack-a-mole".
   LinkedIn devuelve nombres completos de ciudades/países del mundo; se ampliaron
   mucho las listas, pero puede colarse algún remoto de un país no listado. En
