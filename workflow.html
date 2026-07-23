@@ -92,7 +92,7 @@
       <span><i style="background:var(--blue)"></i>Ingesta</span>
       <span><i style="background:var(--green)"></i>Datos</span>
       <span><i style="background:var(--violet)"></i>Web / Cliente</span>
-      <span><i style="background:var(--amber)"></i>Externo (IA)</span>
+      <span><i style="background:var(--amber)"></i>Externo (IA · avisos)</span>
     </div>
     <div class="tools">
       <button id="fit">Ajustar</button>
@@ -116,9 +116,9 @@
 
   // ---- Grafo: nodos (col = columna lógica) ----
   var NODES = [
-    {id:'timer',   c:0, k:'blue',  t:'Timer 12:00',   s:'systemd · diario',  tag:'cron'},
+    {id:'sched',   c:0, k:'blue',  t:'Planificador',  s:'horas configurables', tag:'in-app'},
     {id:'user',    c:0, k:'blue',  t:'Usuario',       s:'Buscar ahora',      tag:'ui'},
-    {id:'run_sh',  c:1, k:'blue',  t:'run_search.sh', s:'wrapper del cron'},
+    {id:'run_sh',  c:0, k:'blue',  t:'run_search.sh', s:'manual · oneshot'},
     {id:'run_all', c:1, k:'blue',  t:'run_all()',     s:'orquesta búsquedas'},
     {id:'run_srch',c:1, k:'blue',  t:'run_search()',  s:'consulta + filtra'},
     {id:'remotive',c:2, k:'blue',  t:'Remotive',      s:'API'},
@@ -143,7 +143,7 @@
     {id:'t_srch',  c:4, k:'green', t:'searches',      s:'config'},
     {id:'t_set',   c:4, k:'green', t:'settings',      s:'config'},
     {id:'t_rev',   c:4, k:'green', t:'company_reviews',s:'caché'},
-    {id:'flask',   c:5, k:'violet',t:'Flask · app.py',s:'13 rutas', tag:'web'},
+    {id:'flask',   c:5, k:'violet',t:'Flask · app.py',s:'28 rutas', tag:'web'},
     {id:'r_index', c:5, k:'violet',t:'Empleos',       s:'GET /'},
     {id:'r_comp',  c:5, k:'violet',t:'Compañías',     s:'GET /companies'},
     {id:'r_sum',   c:5, k:'violet',t:'/companies/summary',s:'POST · AJAX'},
@@ -154,14 +154,18 @@
     {id:'llm',     c:6, k:'amber', t:'llm.py → IA',   s:'Claude / Gemini', tag:'ia'},
     {id:'cvpdf',   c:6, k:'amber', t:'cvpdf.py',      s:'CV nuevo → PDF', tag:'pdf'},
     {id:'r_cv',    c:5, k:'violet',t:'Mi CV',         s:'/cv'},
+    {id:'r_set',   c:5, k:'violet',t:'Configuración', s:'/settings', tag:'config'},
+    {id:'notifier',c:6, k:'violet',t:'notifier.py',   s:'avisos · inmediato/diario', tag:'notif'},
     {id:'t_prof',  c:4, k:'green', t:'profile',       s:'CV · perfil'},
     {id:'t_match', c:4, k:'green', t:'job_matches',   s:'afinidad'},
+    {id:'email',   c:7, k:'amber', t:'Email',         s:'SMTP · HTML estético', tag:'canal'},
+    {id:'telegram',c:7, k:'amber', t:'Telegram',      s:'Bot API', tag:'canal'},
     {id:'browser', c:7, k:'violet',t:'Navegador',     s:'LAN · usuario', tag:'cliente'}
   ];
   // ---- Aristas: kind = normal|config|poll|ext|ret ----
   var SRC = ['remotive','remoteok','jobicy','himalaya','wwr','arbeit','muse','nomads','landing','getonbrd','linkedin'];
   var EDGES = [
-    ['timer','run_sh'],['run_sh','run_all'],['user','run_all'],['run_all','run_srch']
+    ['sched','run_all'],['user','run_all'],['run_sh','run_all'],['run_all','run_srch']
   ];
   SRC.forEach(function(s){ EDGES.push(['run_srch',s]); EDGES.push([s,'f_block']); });
   EDGES.push(
@@ -184,7 +188,12 @@
     ['cv_py','cvpdf'],['cvpdf','browser','ext'],
     ['cv_py','t_prof'],['cv_py','t_match'],
     ['t_prof','cv_py','config'],['t_jobs','cv_py','config'],
-    ['t_match','r_index','config']
+    ['t_match','r_index','config'],
+    // --- Configuración ---
+    ['flask','r_set'],['r_set','browser'],['r_set','t_set','config'],
+    // --- Notificaciones (inmediato tras run_all + resumen diario del planificador) ---
+    ['run_all','notifier'],['sched','notifier','config'],['t_set','notifier','config'],
+    ['notifier','email','ext'],['notifier','telegram','ext']
   );
 
   // ---- Layout por columnas ----

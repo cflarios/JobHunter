@@ -172,16 +172,17 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
   <header>
     <div class="eyebrow">Mapa de arquitectura · auto-alojado en Raspberry Pi</div>
     <h1>Job<span class="dot">Hunter</span></h1>
-    <p class="thesis">Buscador personal de empleos remotos. Cada mediodía barre 11 bolsas de trabajo
-    (10 públicas + LinkedIn vía RapidAPI), filtra por rol, zona y frescura, guarda lo nuevo y te avisa.
+    <p class="thesis">Buscador personal de empleos remotos. A las horas que tú configures barre 11 bolsas de trabajo
+    (10 públicas + LinkedIn vía RapidAPI), filtra por rol, zona y frescura, guarda lo nuevo y te avisa
+    por <b>email</b> o <b>Telegram</b> (al momento o como resumen diario).
     Con IA (proveedor seleccionable, Claude por defecto): resume la reputación de cada empresa y empareja tu CV
     con las ofertas (afinidad, ¿encajo?, carta, mejora y CV nuevo en PDF). Enfocado en DevOps/SRE remoto desde Colombia, ampliable a cualquier rol.</p>
     <div class="chips">
       <div class="chip"><div class="n">11</div><div class="l">Fuentes</div></div>
       <div class="chip"><div class="n">8</div><div class="l">Tablas SQLite</div></div>
-      <div class="chip"><div class="n">26</div><div class="l">Rutas HTTP</div></div>
-      <div class="chip"><div class="n">~1.7k</div><div class="l">Líneas de código</div></div>
-      <div class="chip"><div class="n">3</div><div class="l">Unidades systemd</div></div>
+      <div class="chip"><div class="n">28</div><div class="l">Rutas HTTP</div></div>
+      <div class="chip"><div class="n">2</div><div class="l">Canales de aviso</div></div>
+      <div class="chip"><div class="n">~2.9k</div><div class="l">Líneas de código</div></div>
       <div class="chip"><div class="n">6</div><div class="l">Funciones IA</div></div>
     </div>
     <a class="wfbtn" id="wfbtn" href="/workflow">
@@ -197,7 +198,7 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
   </header>
 
   <section class="blk">
-    <h2 class="sec">Flujo de datos — del cron al navegador</h2>
+    <h2 class="sec">Flujo de datos — del planificador al navegador</h2>
     <div class="legend">
       <span><i style="background:var(--blue)"></i>Ingesta</span>
       <span><i style="background:var(--green)"></i>Datos</span>
@@ -209,10 +210,11 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
       <div class="stage" data-c="blue">
         <div class="num">01</div>
         <div class="stage-card">
-          <div class="stage-head"><span class="stage-title">Disparo</span><span class="stage-tag">timer · usuario</span></div>
+          <div class="stage-head"><span class="stage-title">Disparo</span><span class="stage-tag">planificador · usuario</span></div>
           <div class="nodes">
-            <div class="node"><b>jobhunter-search.timer</b><span class="d">systemd · 12:00 America/Bogota · Persistent (recupera si estuvo apagada)</span></div>
+            <div class="node"><b>Planificador in-app</b><span class="d">hilo de la app web (app._scheduler) · corre a las horas de settings.search_times (una o varias, configurables) · hora America/Bogota</span></div>
             <div class="node"><b>Usuario · Buscar ahora</b><span class="d">POST /run manual desde la UI</span></div>
+            <div class="node" style="border-color:var(--faint)"><b style="color:var(--faint)">jobhunter-search.timer</b><span class="d">systemd fijo a las 12:00 · DESACTIVADO (superado por el planificador in-app)</span></div>
           </div>
         </div>
       </div>
@@ -222,9 +224,9 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
         <div class="stage-card">
           <div class="stage-head"><span class="stage-title">Ingesta / Orquestación</span><span class="stage-tag">fetcher.py</span></div>
           <div class="nodes">
-            <div class="node"><b>run_search.sh</b><span class="d">wrapper del cron → search.log</span></div>
-            <div class="node"><b>run_all()</b><span class="d">recorre búsquedas activas; ventana y modo por búsqueda</span></div>
-            <div class="node"><b>run_search()</b><span class="d">consulta fuentes, filtra, deduplica, inserta, notifica</span></div>
+            <div class="node"><b>run_all()</b><span class="d">recorre búsquedas activas; ventana y modo por búsqueda; al terminar dispara el aviso inmediato</span></div>
+            <div class="node"><b>run_search()</b><span class="d">consulta fuentes, filtra, deduplica, inserta y devuelve los empleos nuevos</span></div>
+            <div class="node"><b>run_search.sh</b><span class="d">wrapper para corridas manuales → search.log</span></div>
           </div>
         </div>
       </div>
@@ -274,8 +276,9 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
         <div class="stage-card">
           <div class="stage-head"><span class="stage-title">Capa web</span><span class="stage-tag">Flask · app.py</span></div>
           <div class="nodes">
-            <div class="node"><b>13 rutas</b><span class="d">empleos, búsquedas, compañías, notificaciones, APIs</span></div>
-            <div class="node"><b>templates/</b><span class="d">Jinja2 · filtro Markdown seguro · favicon SVG</span></div>
+            <div class="node"><b>28 rutas</b><span class="d">empleos, búsquedas, configuración, compañías, notificaciones, CV, APIs</span></div>
+            <div class="node"><b>Planificador + notificaciones</b><span class="d">hilo de fondo (búsquedas programadas + resumen diario) · notifier.py</span></div>
+            <div class="node"><b>templates/</b><span class="d">9 vistas Jinja2 · filtro Markdown seguro · favicon SVG</span></div>
           </div>
         </div>
       </div>
@@ -287,6 +290,7 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
           <div class="nodes">
             <div class="node"><b>Empleos</b><span class="d">lista + filtros + barra "empleos nuevos" (sondeo 45s)</span></div>
             <div class="node"><b>Compañías</b><span class="d">empleadores + Glassdoor + resumen AJAX</span></div>
+            <div class="node"><b>Configuración</b><span class="d">IA + claves + notificaciones + horarios de búsqueda</span></div>
             <div class="node"><b>Notificaciones</b><span class="d">badge sondea /api/unread cada 30s</span></div>
           </div>
         </div>
@@ -322,6 +326,22 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
         </div>
       </div>
     </div>
+
+    <div class="branch">
+      <div class="stage" data-c="violet" style="margin-bottom:0">
+        <div class="num">↳</div>
+        <div class="stage-card">
+          <div class="stage-head"><span class="stage-title">Rama · Notificaciones y programación</span><span class="stage-tag">notifier.py · hilo de la app web</span></div>
+          <div class="nodes">
+            <div class="node"><b>Aviso inmediato</b><span class="d">al terminar run_all(), si hay empleos nuevos → notifier.send_new_jobs() (en try/except, nunca rompe la búsqueda)</span></div>
+            <div class="node"><b>Resumen diario</b><span class="d">hilo de fondo a la hora fijada → maybe_send_digest() (idempotente vía last_digest_date)</span></div>
+            <div class="node"><b>Canal email</b><span class="d">SMTP · HTML estético (tablas + estilos en línea) · contraseña de app cifrada</span></div>
+            <div class="node"><b>Canal Telegram</b><span class="d">Bot API sendMessage (HTML) · token cifrado + chat ID</span></div>
+            <div class="node"><b>Configuración</b><span class="d">/settings: activar canales/modos, horarios, claves — secretos cifrados (keystore + Fernet)</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
   </section>
 
   <section class="blk">
@@ -331,11 +351,11 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
       <tbody>
         <tr><td class="mono">searches</td><td class="cols"><b>id</b>, query, title_keywords, max_age_days, active, created_at</td></tr>
         <tr><td class="mono">blocked_companies</td><td class="cols"><b>name ·PK NOCASE</b>, created_at</td></tr>
-        <tr><td class="mono">jobs</td><td class="cols"><b>id</b>, <span class="fk">search_id→searches</span>, title, company, <span class="pk">url ·unique</span>, source, salary, location, date_posted, posted_ts, found_at, is_new</td></tr>
-        <tr><td class="mono">notifications</td><td class="cols"><b>id</b>, message, created_at, read</td></tr>
-        <tr><td class="mono">settings</td><td class="cols"><b>key</b>, value <span style="color:var(--faint)">· location_mode, max_age_days…</span></td></tr>
-        <tr><td class="mono">company_reviews</td><td class="cols"><b>company</b>, summary, resolved_name, status, generated_at</td></tr>
-        <tr><td class="mono">profile</td><td class="cols"><b>id ·=1</b>, cv_text, role, seniority, years, skills, summary, suggested_keywords, feedback, rewrite, updated_at</td></tr>
+        <tr><td class="mono">jobs</td><td class="cols"><b>id</b>, <span class="fk">search_id→searches</span>, title, company, <span class="pk">url ·unique</span>, source, salary, location, date_posted, posted_ts, skills, found_at, is_new</td></tr>
+        <tr><td class="mono">notifications</td><td class="cols"><b>id</b>, message, created_at, read <span style="color:var(--faint)">· avisos in-app</span></td></tr>
+        <tr><td class="mono">settings</td><td class="cols"><b>key</b>, value <span style="color:var(--faint)">· location_mode, ai_provider, search_times, notify_*/smtp_*/telegram_*, apikey_*/secret_* (cifrados)…</span></td></tr>
+        <tr><td class="mono">company_reviews</td><td class="cols"><b>company</b>, summary, resolved_name, glassdoor_url, status, generated_at</td></tr>
+        <tr><td class="mono">profile</td><td class="cols"><b>id ·=1</b>, cv_text, role, seniority, years, skills, summary, suggested_keywords, feedback, rewrite, generated_cv, updated_at</td></tr>
         <tr><td class="mono">job_matches</td><td class="cols"><b><span class="fk">job_id→jobs</span></b>, score, reason, fit_detail, updated_at</td></tr>
       </tbody>
     </table></div>
@@ -350,11 +370,13 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
         <tr><td class="path">/mark-seen</td><td class="method">POST</td><td>Marca todos los empleos como vistos</td></tr>
         <tr><td class="path">/notifications</td><td class="method">GET</td><td>Historial (marca leídas)</td></tr>
         <tr><td class="path">/notifications/clear</td><td class="method">POST</td><td>Borra notificaciones</td></tr>
-        <tr><td class="path">/searches</td><td class="method">GET·POST</td><td>Búsquedas: alta, keywords de título, modo ubicación, ventana</td></tr>
+        <tr><td class="path">/searches</td><td class="method">GET·POST</td><td>Búsquedas: alta, keywords de título, modo ubicación, ventana, RapidAPI</td></tr>
+        <tr><td class="path">/settings</td><td class="method">GET·POST</td><td>Configuración: proveedor IA + claves + notificaciones (email/Telegram, modos) + horarios de búsqueda</td></tr>
         <tr><td class="path">/run</td><td class="method">POST</td><td>Buscar ahora (todas las activas o una)</td></tr>
         <tr><td class="path">/companies</td><td class="method">GET</td><td>Empleadores reales agregados del campo company</td></tr>
         <tr><td class="path">/companies/summary</td><td class="method">POST</td><td>Genera/cachea resumen de opiniones (JSON si AJAX)</td></tr>
         <tr><td class="path">/companies/block · /unblock</td><td class="method">POST</td><td>Blacklist: bloquear (borra sus ofertas) / desbloquear empresa</td></tr>
+        <tr><td class="path">/blacklist</td><td class="method">GET</td><td>Bloqueos: blacklist de compañías con alta manual</td></tr>
         <tr><td class="path">/cv</td><td class="method">GET</td><td>Mi CV: subir, perfil, afinidad, mejora</td></tr>
         <tr><td class="path">/cv/analyze</td><td class="method">POST</td><td>Analiza el CV (PDF/texto) → perfil</td></tr>
         <tr><td class="path">/cv/match</td><td class="method">POST</td><td>Puntúa todos los empleos contra el perfil (0–100)</td></tr>
@@ -389,7 +411,7 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
 
   <section class="blk">
     <h2 class="sec">CV + IA — Mi CV</h2>
-    <p class="muted" style="font-size:12.5px;margin:-4px 0 12px">Toda la IA pasa por <span class="mono">llm.py</span>, que enruta al <b>proveedor seleccionable</b> desde la página Búsquedas — <b>Claude</b> (Anthropic, <span class="mono">claude-opus-4-8</span>) por defecto o <b>Gemini</b> (Google) como alternativa gratis. Guardado en <span class="mono">settings.ai_provider</span>.</p>
+    <p class="muted" style="font-size:12.5px;margin:-4px 0 12px">Toda la IA pasa por <span class="mono">llm.py</span>, que enruta al <b>proveedor seleccionable</b> desde la página Configuración — <b>Claude</b> (Anthropic, <span class="mono">claude-opus-4-8</span>) por defecto o <b>Gemini</b> (Google) como alternativa gratis. Guardado en <span class="mono">settings.ai_provider</span>.</p>
     <div class="cards">
       <div class="card"><h3>Perfil desde el CV</h3><p><span class="k">cv.py · analyze_cv</span> · lee PDF (inline) o texto → rol, seniority, años, skills y palabras clave sugeridas.</p></div>
       <div class="card"><h3>Afinidad 0–100</h3><p><span class="k">cv.py · match_jobs</span> · puntúa cada empleo contra el perfil; badge y orden por afinidad en Empleos.</p></div>
@@ -402,11 +424,12 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
   </section>
 
   <section class="blk">
-    <h2 class="sec">Despliegue — systemd</h2>
+    <h2 class="sec">Despliegue — systemd + planificador in-app</h2>
     <div class="cards">
-      <div class="card"><h3>jobhunter-web.service</h3><p><span class="k">.venv/bin/python app.py</span> · puerto 8080 · Restart=on-failure · arranca en el boot</p></div>
-      <div class="card"><h3>jobhunter-search.service</h3><p><span class="k">run_search.sh</span> · Type=oneshot · lanzado por el timer</p></div>
-      <div class="card"><h3>jobhunter-search.timer</h3><p><span class="k">OnCalendar 12:00</span> · America/Bogota · Persistent=true (catch-up)</p></div>
+      <div class="card"><h3>jobhunter-web.service</h3><p><span class="k">.venv/bin/python app.py</span> · puerto 8080 · Restart=on-failure · arranca en el boot. <b>Aloja el planificador in-app</b>.</p></div>
+      <div class="card"><h3>Planificador in-app</h3><p><span class="k">app._scheduler</span> · hilo demonio del web service · dispara las búsquedas a las horas de <span class="k">settings.search_times</span> (configurables) y el resumen diario · idempotente.</p></div>
+      <div class="card"><h3>jobhunter-search.service</h3><p><span class="k">run_search.sh</span> · Type=oneshot · queda para <b>corridas manuales</b>.</p></div>
+      <div class="card"><h3>jobhunter-search.timer</h3><p><span class="k">OnCalendar 12:00</span> · <b style="color:var(--faint)">DESACTIVADO</b> · superado por el planificador in-app (horario configurable desde la web).</p></div>
     </div>
   </section>
 
@@ -414,9 +437,10 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
     <h2 class="sec">Seguridad y datos</h2>
     <ul class="list sec-list">
       <li><b>Sin secretos en el repo.</b> <span class="mono">ANTHROPIC_API_KEY</span>, <span class="mono">GEMINI_API_KEY</span> y <span class="mono">RAPIDAPI_KEY</span> viven en un <span class="mono">.env</span> (600, no versionado); systemd lo carga con <span class="mono">EnvironmentFile</span> y <span class="mono">db.py</span> como respaldo. Cada proveedor de IA usa su propia clave.</li>
-      <li><b>.gitignore</b> excluye <span class="mono">.venv/</span>, <span class="mono">jobs.db*</span>, <span class="mono">*.log</span> y <span class="mono">.env</span> (se versiona <span class="mono">.env.example</span>).</li>
+      <li><b>Secretos cifrados en la BD.</b> Las claves de IA, la contraseña SMTP y el token de Telegram que registras desde la web se guardan <b>cifrados</b> (Fernet, <span class="mono">keystore.py</span>); la clave maestra vive en <span class="mono">secret.key</span> (600, fuera del repo). Un volcado de la BD solo revela ciphertext.</li>
+      <li><b>.gitignore</b> excluye <span class="mono">.venv/</span>, <span class="mono">jobs.db*</span>, <span class="mono">*.log</span>, <span class="mono">*.key</span> y <span class="mono">.env</span> (se versiona <span class="mono">.env.example</span>).</li>
       <li><b>Render seguro.</b> Los resúmenes de la IA pasan por un filtro Markdown que escapa HTML antes de mostrarse.</li>
-      <li><b>Solo lectura pública.</b> La app corre en la LAN; el timer recupera corridas perdidas con Persistent=true.</li>
+      <li><b>Solo lectura pública.</b> La app corre en la LAN; el web service (con el planificador) está siempre arriba (Restart=on-failure).</li>
     </ul>
   </section>
 
@@ -426,8 +450,8 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
   </details>
 
   <footer>
-    <span>JobHunter · mapa de arquitectura generado el 2026-07-22</span>
-    <span class="mono">Python · Flask · SQLite · systemd · Claude/Gemini</span>
+    <span>JobHunter · mapa de arquitectura generado el 2026-07-23</span>
+    <span class="mono">Python · Flask · SQLite · systemd · Claude/Gemini · SMTP · Telegram</span>
   </footer>
 
 </div></div>
@@ -435,17 +459,18 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
 <script id="archData" type="application/json">{
   "project": "JobHunter",
   "description": "Buscador personal de empleos remotos auto-alojado en una Raspberry Pi, con emparejamiento de CV por IA. Enfocado en DevOps/SRE remoto (contractor desde Colombia), ampliable a cualquier rol.",
-  "generated": "2026-07-22",
+  "generated": "2026-07-23",
   "host": "Raspberry Pi (Debian 13, Python 3.13) — http://192.168.1.11:8080",
-  "stack": ["Python 3.13", "Flask", "SQLite (WAL)", "systemd", "Claude/Gemini API"],
+  "stack": ["Python 3.13", "Flask", "SQLite (WAL)", "systemd", "Claude/Gemini API", "SMTP (email)", "Telegram Bot API"],
   "metrics": {
     "sources": 11,
     "db_tables": 8,
-    "http_routes": 26,
-    "python_lines": 2390,
-    "template_files": 8,
+    "http_routes": 28,
+    "python_lines": 2900,
+    "template_files": 9,
     "systemd_units": 3,
-    "ai_features": 2
+    "ai_features": 2,
+    "notify_channels": 2
   },
   "layers": [
     {
@@ -453,8 +478,9 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
       "name": "Disparadores",
       "color": "blue",
       "components": [
-        { "name": "jobhunter-search.timer", "detail": "systemd timer, OnCalendar=*-*-* 12:00:00 (America/Bogota), Persistent=true" },
-        { "name": "Usuario · Buscar ahora", "detail": "POST /run desde la UI, manual" }
+        { "name": "Planificador in-app", "detail": "hilo demonio de la app web (app._scheduler): cada minuto lanza run_all() a las horas de settings.search_times (una o varias, configurables en Configuración; por defecto 12:00 America/Bogota) y comprueba el resumen diario. Idempotente vía last_scheduled_run" },
+        { "name": "jobhunter-search.timer (desactivado)", "detail": "el timer systemd fijo a las 12:00 quedó DESACTIVADO; superado por el planificador in-app configurable. Unidades en deploy/ como referencia" },
+        { "name": "Usuario · Buscar ahora", "detail": "POST /run desde la UI, manual (o systemctl start jobhunter-search.service)" }
       ]
     },
     {
@@ -510,8 +536,9 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
       "name": "Capa web (Flask)",
       "color": "violet",
       "components": [
-        { "name": "app.py", "detail": "22 rutas + filtro Markdown seguro + favicon SVG + mapas" },
-        { "name": "templates/", "detail": "Jinja2: base, index, searches, notifications, companies, cv, _review, _fitblock" }
+        { "name": "app.py", "detail": "rutas + filtro Markdown seguro + favicon SVG + mapas + página Configuración (/settings)" },
+        { "name": "notifier.py", "detail": "notificaciones multi-canal (email SMTP con HTML estético + Telegram Bot API) y multi-modo (inmediato tras búsqueda / resumen diario a hora fija). Despacha a todos los canales activos; secretos cifrados vía keystore. El resumen diario lo dispara un hilo demonio de la app web (maybe_send_digest, idempotente)" },
+        { "name": "templates/", "detail": "Jinja2: base, index, searches, settings, notifications, companies, cv, _review, _fitblock" }
       ]
     },
     {
@@ -546,9 +573,11 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
     }
   ],
   "data_flow": [
-    "Timer 12:00 (o Usuario) → run_search.sh → fetcher.run_all()",
+    "Planificador in-app (hilo de la web) a las horas de search_times, o Usuario → fetcher.run_all()",
     "run_search() → 11 fuentes (HTTP; LinkedIn vía RapidAPI) → filtros (blacklist de empresas, título, ubicación, fecha, dedup)",
-    "→ INSERT OR IGNORE en jobs + INSERT notificación si hay nuevos",
+    "→ INSERT OR IGNORE en jobs + INSERT notificación in-app si hay nuevos",
+    "Al terminar run_all(): si hubo empleos nuevos → notifier.send_new_jobs() → despacha a los canales activos (email HTML por SMTP y/o Telegram) en modo inmediato; nunca rompe la búsqueda",
+    "Resumen diario: hilo demonio en la app web (cada 60s) → notifier.maybe_send_digest() → a la hora fijada, junta lo encontrado hoy y despacha a los canales activos; idempotente vía last_digest_date",
     "Flask lee jobs.db → renderiza Empleos/Compañías/Mi CV/Notificaciones",
     "Navegador sondea /api/jobs-status (45s) y /api/unread (30s) para avisar sin recargar",
     "Toda la IA pasa por llm.py, que enruta al proveedor activo (Claude por defecto, o Gemini) según settings.ai_provider",
@@ -573,7 +602,8 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
     { "path": "/", "method": "GET", "purpose": "Empleos: lista + filtros + % de afinidad + orden por afinidad" },
     { "path": "/run", "method": "POST", "purpose": "Buscar ahora (todas las activas o una)" },
     { "path": "/mark-seen", "method": "POST", "purpose": "Marca todos los empleos como vistos" },
-    { "path": "/searches", "method": "GET/POST", "purpose": "Búsquedas: alta, keywords de título, modo ubicación, ventana, proveedor de IA" },
+    { "path": "/searches", "method": "GET/POST", "purpose": "Búsquedas: alta, keywords de título, modo ubicación, ventana global, interruptor RapidAPI" },
+    { "path": "/settings", "method": "GET/POST", "purpose": "Configuración: proveedor de IA + claves de API + notificaciones multi-canal (email/SMTP + Telegram) y modos (inmediato / resumen diario) + programación de búsquedas (horarios del planificador, una o varias horas); secretos cifrados, envío de prueba" },
     { "path": "/notifications", "method": "GET", "purpose": "Historial (marca leídas)" },
     { "path": "/companies", "method": "GET", "purpose": "Empleadores reales agregados del campo company" },
     { "path": "/companies/summary", "method": "POST", "purpose": "Resumen de opiniones vía IA (proveedor activo, JSON si AJAX)" },
@@ -592,14 +622,16 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
   ],
   "deployment": {
     "web_service": { "unit": "jobhunter-web.service", "exec": ".venv/bin/python app.py", "port": 8080, "restart": "on-failure" },
-    "search_service": { "unit": "jobhunter-search.service", "exec": "run_search.sh", "type": "oneshot" },
-    "search_timer": { "unit": "jobhunter-search.timer", "schedule": "*-*-* 12:00:00 America/Bogota", "persistent": true }
+    "search_service": { "unit": "jobhunter-search.service", "exec": "run_search.sh", "type": "oneshot", "note": "solo corridas manuales; el disparo automático lo hace el planificador in-app" },
+    "search_timer": { "unit": "jobhunter-search.timer", "schedule": "DESACTIVADO — superado por el planificador in-app (settings.search_times, configurable)", "persistent": true },
+    "in_app_scheduler": { "host": "hilo demonio del web service (app._scheduler)", "runs": "run_all() a las horas de settings.search_times (configurables, multi-hora) + resumen diario (notifier.maybe_send_digest)" }
   },
   "files": [
     { "file": "db.py", "role": "Esquema y helpers de SQLite (7 tablas)" },
     { "file": "fetcher.py", "role": "11 fuentes (10 públicas + LinkedIn RapidAPI), helper _rapidapi_get, filtros, orquestación" },
     { "file": "app.py", "role": "Servidor Flask, 22 rutas, filtro Markdown, favicon, mapas" },
     { "file": "llm.py", "role": "Capa de proveedor de IA: enruta a Claude o Gemini según settings.ai_provider" },
+    { "file": "notifier.py", "role": "Notificaciones multi-canal (email SMTP + Telegram) y multi-modo (inmediato / resumen diario); secretos cifrados (keystore)" },
     { "file": "reviews.py", "role": "Resumen de opiniones de empresas vía IA (llm.py) + búsqueda web" },
     { "file": "cv.py", "role": "CV + IA: analizar, match, ¿encajo?, carta, mejora, generar CV (llm.py)" },
     { "file": "cvpdf.py", "role": "Renderiza el CV nuevo a PDF (fpdf2 + DejaVu, ≤2 páginas)" },
@@ -615,5 +647,6 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
   ]
 }</script>
 
+<script>(function(){try{var d=document.getElementById("archData").textContent;var p=document.getElementById("jsonPre");if(p)p.textContent=d;}catch(e){}})();</script>
 </body>
 </html>
