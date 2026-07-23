@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Bloqueos · JobHunter{% endblock %}
+{% block body %}
+
+<h2 style="margin:0 0 6px">Bloqueos <span class="muted" style="font-weight:400;font-size:15px">· blacklist de compañías</span></h2>
+<p class="muted" style="margin-top:0">Empresas que <b>no</b> aparecerán en las búsquedas. Bloquear una empresa evita gastar cómputo consultando y guardando sus ofertas. Añádelas a mano —aunque aún no hayan publicado— o bloquéalas desde <a href="{{ url_for('companies') }}">Compañías</a>.</p>
+
+<div class="card">
+  <h3 style="margin-top:0">Bloquear una empresa</h3>
+  <form method="post" action="{{ url_for('company_block') }}" class="row">
+    <input type="text" name="company" placeholder="Nombre de la empresa, p. ej. Acme Corp"
+           autocomplete="off" style="flex:1;min-width:220px" required>
+    <button class="btn danger" type="submit">🚫 Bloquear</button>
+  </form>
+  <p class="muted" style="margin:8px 0 0;font-size:13px">El nombre no distingue mayúsculas/minúsculas. Si la empresa ya tenía ofertas guardadas, se eliminan al bloquearla.</p>
+</div>
+
+<div class="card">
+  <div class="row" style="justify-content:space-between;align-items:baseline">
+    <h3 style="margin:0">Empresas bloqueadas</h3>
+    <span class="pill">{{ blocked|length }}</span>
+  </div>
+  {% if blocked %}
+  <div id="blocked-list" style="margin-top:6px">
+    {% for b in blocked %}
+    <div class="blocked-item row" style="justify-content:space-between;border-top:1px solid var(--line);padding:11px 2px">
+      <div>
+        <span style="font-weight:600">{{ b.name }}</span>
+        <span class="muted" style="font-size:12px;margin-left:8px">bloqueada {{ b.created_at }}</span>
+      </div>
+      <form method="post" action="{{ url_for('company_unblock') }}">
+        <input type="hidden" name="company" value="{{ b.name }}">
+        <button class="btn sm ghost" type="submit" title="Volver a permitir esta empresa">Desbloquear</button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+  <div id="blocked-pager" class="pager"></div>
+  <p class="muted" style="font-size:12.5px;margin:10px 0 0">Al desbloquear, sus ofertas volverán a aparecer en la próxima búsqueda.</p>
+  <script>
+    jhPaginate(document.getElementById('blocked-list'), '.blocked-item', 12,
+               document.getElementById('blocked-pager'));
+  </script>
+  {% else %}
+  <p class="muted" style="margin:12px 0 0">Aún no hay empresas bloqueadas.</p>
+  {% endif %}
+</div>
+{% endblock %}

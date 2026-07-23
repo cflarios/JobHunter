@@ -269,8 +269,6 @@ def companies():
     """).fetchall()
     reviews = {r["company"]: r for r in
                con.execute("SELECT * FROM company_reviews").fetchall()}
-    blocked = [r["name"] for r in con.execute(
-        "SELECT name FROM blocked_companies ORDER BY name COLLATE NOCASE")]
     con.close()
     companies = []
     for r in rows:
@@ -290,7 +288,7 @@ def companies():
             "review_ok": (rev["status"] == "ok") if rev else None,
             "review_at": rev["generated_at"] if rev else None,
         })
-    return render_template("companies.html", companies=companies, blocked=blocked)
+    return render_template("companies.html", companies=companies)
 
 
 @app.route("/companies/summary", methods=["POST"])
@@ -348,6 +346,14 @@ def company_glassdoor_name():
     return redirect(url_for("companies") + f"#c-{quote_plus(company)}")
 
 
+def _back(default_endpoint):
+    """Vuelve a la página de origen (companies o blacklist) o a un fallback."""
+    ref = request.referrer or ""
+    if "/blacklist" in ref:
+        return redirect(url_for("blacklist_page"))
+    return redirect(url_for(default_endpoint))
+
+
 @app.route("/companies/block", methods=["POST"])
 def company_block():
     company = request.form.get("company", "").strip()
@@ -361,7 +367,7 @@ def company_block():
         con.close()
         flash(f"«{company}» bloqueada. No volverá a aparecer en las búsquedas"
               + (f"; se quitaron {n} oferta(s) guardada(s)." if n else "."), "ok")
-    return redirect(url_for("companies"))
+    return _back("companies")
 
 
 @app.route("/companies/unblock", methods=["POST"])
@@ -373,7 +379,17 @@ def company_unblock():
         con.commit()
         con.close()
         flash(f"«{company}» desbloqueada.", "ok")
-    return redirect(url_for("companies"))
+    return _back("companies")
+
+
+@app.route("/blacklist")
+def blacklist_page():
+    con = get_db()
+    blocked = con.execute(
+        "SELECT name, created_at FROM blocked_companies ORDER BY created_at DESC, name COLLATE NOCASE"
+    ).fetchall()
+    con.close()
+    return render_template("blacklist.html", blocked=blocked)
 
 
 def _load_profile(con):

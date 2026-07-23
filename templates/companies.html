@@ -6,22 +6,7 @@
   <h2 style="margin:0">Compañías que han publicado</h2>
   <span class="muted">{{ companies|length }} empresa(s)</span>
 </div>
-<p class="muted" style="margin-top:0">Empleadores reales detrás de las ofertas (no las bolsas de empleo). Genera un resumen de opiniones, abre su Glassdoor o bloquéala para que no aparezca más.</p>
-
-{% if blocked %}
-<div class="card" style="border-color:var(--warn)">
-  <h3 style="margin-top:0">🚫 Compañías bloqueadas ({{ blocked|length }})</h3>
-  <p class="muted" style="margin:0 0 10px;font-size:13px">No aparecen en las búsquedas. Desbloquea para volver a incluirlas (sus ofertas se recuperarán en la próxima búsqueda).</p>
-  <div class="row" style="flex-wrap:wrap;gap:8px">
-    {% for b in blocked %}
-    <form method="post" action="{{ url_for('company_unblock') }}" style="display:inline-flex">
-      <input type="hidden" name="company" value="{{ b }}">
-      <button class="btn sm ghost" type="submit" title="Desbloquear">{{ b }} ✕</button>
-    </form>
-    {% endfor %}
-  </div>
-</div>
-{% endif %}
+<p class="muted" style="margin-top:0">Empleadores reales detrás de las ofertas (no las bolsas de empleo). Genera un resumen de opiniones, abre su Glassdoor o bloquéala para que no aparezca más (la gestionas en <a href="{{ url_for('blacklist_page') }}">Bloqueos</a>).</p>
 
 <div id="companies-list">
 {% for c in companies %}

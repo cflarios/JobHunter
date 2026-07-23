@@ -145,10 +145,13 @@ En `fetcher.run_search()`, en este orden:
 
 También, antes de los filtros anteriores: **blacklist de compañías**
 (`blocked_companies`) — los empleos cuya empresa esté bloqueada se descartan
-(comparación case-insensitive por `name.strip().lower()`). Se gestiona desde la
-página Compañías (botón "🚫 Bloquear" por tarjeta; sección de bloqueadas para
-desbloquear). Al bloquear, `/companies/block` también **borra** los empleos ya
-guardados de esa empresa para que desaparezcan del listado al instante.
+(comparación case-insensitive por `name.strip().lower()`). Se gestiona en la
+**página Bloqueos** (`/blacklist`): **añadir a mano** el nombre (bloqueo
+preventivo, sin gastar cómputo) + lista con "Desbloquear". El botón "🚫 Bloquear"
+por tarjeta en Compañías sigue existiendo. Al bloquear, `/companies/block` también
+**borra** los empleos ya guardados de esa empresa (desaparecen al instante).
+`/companies/block` y `/unblock` vuelven al **origen** (referrer: Compañías o
+Bloqueos) vía `app._back()`.
 
 Configurable desde la página **Búsquedas** (por búsqueda) y con ajustes globales.
 
@@ -231,6 +234,7 @@ Puede forzarse el proveedor con la env `AI_PROVIDER` en runs manuales.
 Empleos `/` · Buscar ahora `/run` · Búsquedas `/searches` · Notificaciones
 `/notifications` · Compañías `/companies` (+ `/companies/summary`,
 `/companies/glassdoor-name`, `/companies/block`, `/companies/unblock`) ·
+**Bloqueos** `/blacklist` (blacklist de compañías, alta manual) ·
 **Mi CV** `/cv` (+ `/cv/analyze`, `/cv/match`, `/cv/improve`, `/cv/apply-keywords`,
 `/cv/build`, `/cv/download?lang=`) · por oferta `/jobs/<id>/fit` y `/cover` ·
 mapas `/architecture` `/architecture.json` `/workflow` · polling `/api/unread`

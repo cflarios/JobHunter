@@ -11,23 +11,64 @@
 :root{
   --bg:#0f1420; --card:#171e2e; --card2:#1e2739; --line:#2a3550;
   --txt:#e6ecf5; --mut:#94a3c4; --accent:#4f8cff; --accent2:#22c55e;
-  --warn:#f59e0b; --pill:#243049;
+  --warn:#f59e0b; --pill:#243049; --side:236px; --side-collapsed:66px;
 }
 *{box-sizing:border-box}
 body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
   background:var(--bg);color:var(--txt);line-height:1.5}
 a{color:var(--accent);text-decoration:none}
-header{background:var(--card);border-bottom:1px solid var(--line);
-  position:sticky;top:0;z-index:10}
-.wrap{max-width:1080px;margin:0 auto;padding:0 20px}
-nav{display:flex;align-items:center;gap:22px;height:60px}
-nav .brand{font-weight:700;font-size:18px;margin-right:auto}
-nav .brand span{color:var(--accent)}
-nav a{color:var(--mut);font-weight:500;position:relative}
-nav a.active,nav a:hover{color:var(--txt)}
+.wrap{max-width:1060px;margin:0 auto;padding:0 24px}
+/* Panel lateral izquierdo */
+.sidebar{position:fixed;top:0;left:0;bottom:0;width:var(--side);background:var(--card);
+  border-right:1px solid var(--line);display:flex;flex-direction:column;
+  padding:20px 14px 16px;z-index:40;overflow-y:auto}
+.side-top{display:flex;align-items:center;padding:4px 6px 16px}
+.side-brand{font-weight:700;font-size:20px;letter-spacing:-.01em;padding:0 4px}
+.side-brand span{color:var(--accent)}
+.side-collapse{margin-left:auto;flex:0 0 auto;background:transparent;border:1px solid var(--line);
+  color:var(--mut);width:28px;height:28px;border-radius:8px;cursor:pointer;font-size:15px;line-height:1}
+.side-collapse:hover{color:var(--txt);border-color:var(--accent)}
+.side-nav{display:flex;flex-direction:column;gap:3px}
+.side-nav a,.side-docs a{display:flex;align-items:center;gap:11px;padding:9px 11px;
+  border-radius:9px;color:var(--mut);font-weight:500;font-size:14px}
+.side-nav a:hover,.side-docs a:hover{background:var(--card2);color:var(--txt)}
+.side-nav a.active,.side-docs a.active{background:var(--card2);color:var(--txt);
+  box-shadow:inset 3px 0 0 var(--accent)}
+.side-ico{font-size:16px;width:22px;text-align:center;flex:0 0 auto}
+.side-docs{margin-top:auto;border-top:1px solid var(--line);padding-top:12px}
+.side-ext{margin-left:auto;color:var(--mut);opacity:.6;font-size:12px}
+.side-label{font-size:10.5px;text-transform:uppercase;letter-spacing:.12em;
+  color:var(--mut);opacity:.7;padding:2px 11px 8px;font-weight:700}
 .badge{background:var(--accent2);color:#04210f;border-radius:10px;
-  font-size:11px;font-weight:700;padding:1px 7px;margin-left:5px}
-main{padding:26px 0 60px}
+  font-size:11px;font-weight:700;padding:1px 7px;margin-left:auto}
+/* Botón de menú (móvil) + overlay */
+.menu-toggle{display:none;position:fixed;top:12px;left:12px;z-index:50;width:42px;height:42px;
+  background:var(--card);border:1px solid var(--line);color:var(--txt);border-radius:10px;
+  font-size:19px;cursor:pointer}
+.side-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:39}
+main{margin-left:var(--side);padding:26px 0 60px}
+/* Panel contraído (solo escritorio): rail de iconos */
+@media(min-width:861px){
+  .nav-collapsed .sidebar{width:var(--side-collapsed);padding-left:8px;padding-right:8px}
+  .nav-collapsed main{margin-left:var(--side-collapsed)}
+  .nav-collapsed .side-txt,.nav-collapsed .side-ext,.nav-collapsed .side-label,
+  .nav-collapsed .side-brand{display:none}
+  .nav-collapsed .side-top{justify-content:center;padding:4px 0 16px}
+  .nav-collapsed .side-collapse{margin-left:0}
+  .nav-collapsed .side-nav a,.nav-collapsed .side-docs a{justify-content:center;padding:10px 0;position:relative}
+  .nav-collapsed .side-ico{width:auto}
+  .nav-collapsed .badge{position:absolute;top:5px;right:14px;min-width:9px;width:9px;height:9px;
+    padding:0;font-size:0;line-height:0;border-radius:50%;margin:0}
+}
+@media(max-width:860px){
+  .menu-toggle{display:block}
+  .side-collapse{display:none}
+  .sidebar{transform:translateX(-100%);transition:transform .22s ease;
+    box-shadow:0 0 50px rgba(0,0,0,.6)}
+  .sidebar.open{transform:none}
+  .side-overlay.open{display:block}
+  main{margin-left:0;padding-top:64px}
+}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;
   padding:18px;margin-bottom:16px}
 .btn{background:var(--accent);color:#fff;border:none;border-radius:8px;
@@ -108,6 +149,7 @@ details.section>summary .chev{margin-left:auto;color:var(--mut);font-size:11px;
   transition:transform .18s}
 details.section[open]>summary .chev{transform:rotate(180deg)}
 </style>
+<script>try{if(localStorage.getItem('navCollapsed')==='1')document.documentElement.classList.add('nav-collapsed');}catch(e){}</script>
 <script>
 // Spinner al enviar formularios lentos (marcados con class="busy")
 document.addEventListener('submit', function(e){
@@ -153,16 +195,27 @@ window.jhPaginate = function(listEl, itemSel, size, pagerEl){
 </script>
 </head>
 <body>
-<header><div class="wrap"><nav>
-  <div class="brand">Job<span>Hunter</span></div>
-  <a href="{{ url_for('index') }}" class="{{ 'active' if request.endpoint=='index' }}">Empleos</a>
-  <a href="{{ url_for('companies') }}" class="{{ 'active' if request.endpoint=='companies' }}">Compañías</a>
-  <a href="{{ url_for('cv_page') }}" class="{{ 'active' if request.endpoint=='cv_page' }}">Mi CV</a>
-  <a href="{{ url_for('searches') }}" class="{{ 'active' if request.endpoint=='searches' }}">Búsquedas</a>
-  <a href="{{ url_for('notifications') }}" class="{{ 'active' if request.endpoint=='notifications' }}">
-    Notificaciones<span id="notif-badge" class="badge" style="display:none"></span></a>
-  <a href="{{ url_for('architecture_page') }}">Arquitectura</a>
-</nav></div></header>
+<button class="menu-toggle" id="menu-toggle" aria-label="Abrir menú" aria-expanded="false">☰</button>
+<aside class="sidebar" id="sidebar">
+  <div class="side-top">
+    <div class="side-brand">Job<span>Hunter</span></div>
+    <button class="side-collapse" id="side-collapse" title="Contraer o expandir el panel" aria-label="Contraer o expandir el panel">«</button>
+  </div>
+  <nav class="side-nav">
+    <a href="{{ url_for('index') }}" class="{{ 'active' if request.endpoint=='index' }}" title="Empleos"><span class="side-ico">💼</span><span class="side-txt">Empleos</span></a>
+    <a href="{{ url_for('companies') }}" class="{{ 'active' if request.endpoint=='companies' }}" title="Compañías"><span class="side-ico">🏢</span><span class="side-txt">Compañías</span></a>
+    <a href="{{ url_for('blacklist_page') }}" class="{{ 'active' if request.endpoint=='blacklist_page' }}" title="Bloqueos"><span class="side-ico">🚫</span><span class="side-txt">Bloqueos</span></a>
+    <a href="{{ url_for('cv_page') }}" class="{{ 'active' if request.endpoint=='cv_page' }}" title="Mi CV"><span class="side-ico">📄</span><span class="side-txt">Mi CV</span></a>
+    <a href="{{ url_for('searches') }}" class="{{ 'active' if request.endpoint=='searches' }}" title="Búsquedas"><span class="side-ico">🔍</span><span class="side-txt">Búsquedas</span></a>
+    <a href="{{ url_for('notifications') }}" class="{{ 'active' if request.endpoint=='notifications' }}" title="Notificaciones"><span class="side-ico">🔔</span><span class="side-txt">Notificaciones</span><span id="notif-badge" class="badge" style="display:none"></span></a>
+  </nav>
+  <div class="side-docs">
+    <div class="side-label">Documentación</div>
+    <a href="{{ url_for('architecture_page') }}" target="_blank" rel="noopener" title="Arquitectura"><span class="side-ico">🗺️</span><span class="side-txt">Arquitectura</span><span class="side-ext">↗</span></a>
+    <a href="{{ url_for('workflow_page') }}" target="_blank" rel="noopener" title="Workflow"><span class="side-ico">🔀</span><span class="side-txt">Workflow</span><span class="side-ext">↗</span></a>
+  </div>
+</aside>
+<div class="side-overlay" id="side-overlay"></div>
 <main><div class="wrap">
   {% with msgs = get_flashed_messages() %}
     {% for m in msgs %}<div class="flash">{{ m }}</div>{% endfor %}
@@ -226,6 +279,38 @@ window.jhPaginate = function(listEl, itemSel, size, pagerEl){
       onConfirm: function(){ f.submit(); }
     });
   }, true);
+})();
+
+// Botón de contraer/expandir el panel (escritorio), con estado persistente.
+(function(){
+  var btn = document.getElementById('side-collapse');
+  if(!btn) return;
+  function apply(c){
+    document.documentElement.classList.toggle('nav-collapsed', c);
+    btn.textContent = c ? '»' : '«';
+    try{ localStorage.setItem('navCollapsed', c ? '1' : '0'); }catch(e){}
+  }
+  btn.textContent = document.documentElement.classList.contains('nav-collapsed') ? '»' : '«';
+  btn.addEventListener('click', function(){
+    apply(!document.documentElement.classList.contains('nav-collapsed'));
+  });
+})();
+
+// Panel lateral en móvil: abrir/cerrar con el botón ☰, overlay y Esc.
+(function(){
+  var t=document.getElementById('menu-toggle'),
+      sb=document.getElementById('sidebar'),
+      ov=document.getElementById('side-overlay');
+  if(!t||!sb||!ov) return;
+  function set(open){
+    sb.classList.toggle('open',open);
+    ov.classList.toggle('open',open);
+    t.setAttribute('aria-expanded',open?'true':'false');
+  }
+  t.addEventListener('click',function(){ set(!sb.classList.contains('open')); });
+  ov.addEventListener('click',function(){ set(false); });
+  sb.querySelectorAll('a').forEach(function(a){ a.addEventListener('click',function(){ set(false); }); });
+  document.addEventListener('keydown',function(e){ if(e.key==='Escape') set(false); });
 })();
 
 async function poll(){
