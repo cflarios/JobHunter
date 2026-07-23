@@ -1,0 +1,14 @@
+<details class="ai-box ok" {{ 'open' if expanded|default(false) }}>
+  <summary>🎯 CV a medida de esta vacante · optimizado ATS<span class="chev">▾</span></summary>
+  <div class="ai-body">
+    {{ notes|md }}
+    <div class="row" style="gap:10px;align-items:center;margin-top:10px">
+      <a class="btn sm green" href="{{ url_for('job_cv_download', job_id=job_id) }}">⬇ Descargar CV a medida (PDF)</a>
+      <span class="pill">{{ 'Español' if lang=='es' else 'English' }}</span>
+    </div>
+    <div class="muted" style="font-size:11px;margin-top:8px">
+      Adaptado por {{ ai_label }} sobre tu CV generado · <b>no inventa datos</b>:
+      lo que aparece en «no respaldado» debes resolverlo tú. Revísalo antes de postular.
+    </div>
+  </div>
+</details>

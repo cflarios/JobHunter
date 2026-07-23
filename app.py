@@ -101,6 +101,8 @@ def index():
     else:
         sql += " ORDER BY j.posted_ts DESC, j.found_at DESC"
     import skills as skl
+    # Empleos que ya tienen un CV adaptado (para mostrar la descarga al cargar).
+    tailored_ids = {r["job_id"] for r in con.execute("SELECT job_id FROM tailored_cvs")}
     jobs = []
     for r in con.execute(sql, params).fetchall():
         j = dict(r)
@@ -108,8 +110,12 @@ def index():
         stored = (j.get("skills") or "").strip()
         j["skill_list"] = ([s.strip() for s in stored.split(",") if s.strip()]
                            if stored else skl.extract_skills(j["title"]))
+        j["tailored"] = j["id"] in tailored_ids
         jobs.append(j)
-    has_profile = con.execute("SELECT 1 FROM profile WHERE id=1").fetchone() is not None
+    prow = con.execute("SELECT generated_cv FROM profile WHERE id=1").fetchone()
+    has_profile = prow is not None
+    # El CV a medida se construye sobre el CV generado: sin él, no se ofrece.
+    cv_langs = list(_generated_cv_langs(prow["generated_cv"]).keys()) if prow else []
     n_matches = con.execute("SELECT COUNT(*) c FROM job_matches").fetchone()["c"]
 
     searches = con.execute(
@@ -129,7 +135,7 @@ def index():
                            sources=sources, unread=unread, stats=stats,
                            f_q=q, f_source=source, f_search=active_search,
                            f_days=days, f_sort=sort, has_profile=has_profile,
-                           n_matches=n_matches)
+                           n_matches=n_matches, cv_langs=cv_langs)
 
 
 @app.route("/mark-seen", methods=["POST"])
@@ -709,9 +715,10 @@ def cv_clear():
     con = get_db()
     con.execute("DELETE FROM profile")
     con.execute("DELETE FROM job_matches")
+    con.execute("DELETE FROM tailored_cvs")   # dependen del CV generado
     con.commit()
     con.close()
-    flash("Perfil y afinidades borrados.", "ok")
+    flash("Perfil, afinidades y CVs a medida borrados.", "ok")
     return redirect(url_for("cv_page"))
 
 
@@ -737,6 +744,72 @@ def job_fit(job_id):
         return jsonify(ok=True, html=html, score=res["score"])
     con.close()
     return jsonify(ok=False, error=res.get("error", "")), 500
+
+
+@app.route("/jobs/<int:job_id>/tailor", methods=["POST"])
+def job_tailor(job_id):
+    """Adapta el CV generado a esta vacante (optimización ATS) y lo cachea."""
+    import json
+    con = get_db()
+    p = _load_profile(con)
+    job = con.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
+    if not p or not job:
+        con.close()
+        return jsonify(ok=False, error="Falta perfil o empleo"), 400
+    langs = _generated_cv_langs(p.get("generated_cv"))
+    if not langs:
+        con.close()
+        return jsonify(ok=False,
+                       error="Primero genera tu CV nuevo en «Mi CV» — es la base que se adapta."), 400
+    lang = request.form.get("lang", "")
+    if lang not in langs:
+        lang = "es" if "es" in langs else next(iter(langs))
+    jd = request.form.get("jd", "").strip()[:12000]
+    res = cvai.tailor_cv(langs[lang], dict(job), lang=lang, job_desc=jd or None, profile=p)
+    if not res.get("ok"):
+        con.close()
+        return jsonify(ok=False, error=res.get("error", "")), 500
+    con.execute(
+        """INSERT INTO tailored_cvs(job_id,lang,cv,notes,ats_score,job_desc,updated_at)
+           VALUES(?,?,?,?,?,?,datetime('now','localtime'))
+           ON CONFLICT(job_id) DO UPDATE SET lang=excluded.lang, cv=excluded.cv,
+             notes=excluded.notes, ats_score=excluded.ats_score,
+             job_desc=excluded.job_desc, updated_at=excluded.updated_at""",
+        (job_id, lang, json.dumps(res["cv"], ensure_ascii=False), res["notes"],
+         res["ats_score"], jd or None))
+    con.commit()
+    con.close()
+    html = render_template("_tailorblock.html", notes=res["notes"], job_id=job_id,
+                           lang=lang, expanded=True)
+    return jsonify(ok=True, html=html)
+
+
+@app.route("/jobs/<int:job_id>/cv.pdf")
+def job_cv_download(job_id):
+    """Descarga el CV adaptado a esta vacante en PDF."""
+    import json
+    from io import BytesIO
+    con = get_db()
+    row = con.execute(
+        "SELECT t.*, j.company, j.title FROM tailored_cvs t "
+        "JOIN jobs j ON j.id=t.job_id WHERE t.job_id=?", (job_id,)).fetchone()
+    con.close()
+    if not row:
+        flash("Aún no has generado el CV a medida de esa vacante.", "ok")
+        return redirect(url_for("index"))
+    try:
+        data = json.loads(row["cv"])
+    except (ValueError, TypeError):
+        flash("El CV a medida guardado no es válido; vuelve a generarlo.", "ok")
+        return redirect(url_for("index"))
+    import cvpdf
+    pdf_bytes = cvpdf.render(data, lang=row["lang"] or "es")
+    def _safe(s):
+        return "".join(c if c.isalnum() else "_" for c in (s or "")).strip("_")
+    name = _safe(data.get("name")) or "CV"
+    comp = _safe(row["company"]) or "vacante"
+    return send_file(BytesIO(pdf_bytes), mimetype="application/pdf", as_attachment=True,
+                     download_name=f"CV_{name}_{comp}_{(row['lang'] or 'es').upper()}.pdf")
 
 
 @app.route("/jobs/<int:job_id>/cover", methods=["POST"])

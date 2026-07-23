@@ -156,6 +156,8 @@
     {id:'r_cv',    c:5, k:'violet',t:'Mi CV',         s:'/cv'},
     {id:'r_set',   c:5, k:'violet',t:'Configuración', s:'/settings', tag:'config'},
     {id:'notifier',c:6, k:'violet',t:'notifier.py',   s:'avisos · inmediato/diario', tag:'notif'},
+    {id:'tailor',  c:6, k:'amber', t:'tailor_cv()',    s:'CV a medida ATS', tag:'ats'},
+    {id:'t_tcv',   c:4, k:'green', t:'tailored_cvs',   s:'CV por vacante'},
     {id:'t_prof',  c:4, k:'green', t:'profile',       s:'CV · perfil'},
     {id:'t_match', c:4, k:'green', t:'job_matches',   s:'afinidad'},
     {id:'email',   c:7, k:'amber', t:'Email',         s:'SMTP · HTML estético', tag:'canal'},
@@ -193,7 +195,12 @@
     ['flask','r_set'],['r_set','browser'],['r_set','t_set','config'],
     // --- Notificaciones (inmediato tras run_all + resumen diario del planificador) ---
     ['run_all','notifier'],['sched','notifier','config'],['t_set','notifier','config'],
-    ['notifier','email','ext'],['notifier','telegram','ext']
+    ['notifier','email','ext'],['notifier','telegram','ext'],
+    // --- CV a medida por vacante (ATS) ---
+    ['r_index','tailor','ext'],['browser','tailor','ext'],
+    ['t_prof','tailor','config'],['t_jobs','tailor','config'],
+    ['tailor','llm','ext'],['llm','tailor','ret'],
+    ['tailor','t_tcv'],['tailor','cvpdf'],['t_tcv','browser','ext']
   );
 
   // ---- Layout por columnas ----

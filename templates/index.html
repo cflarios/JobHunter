@@ -108,11 +108,23 @@
       {% if has_profile %}
       <button class="btn sm ghost fit-btn" data-id="{{ j.id }}">¿Encajo aquí?</button>
       <button class="btn sm ghost cover-btn" data-id="{{ j.id }}">✉ Carta</button>
+      {% if cv_langs %}
+      <button class="btn sm tailor-btn" data-id="{{ j.id }}"
+              title="Adapta tu CV generado a esta vacante para maximizar el paso por el ATS">🎯 CV a medida</button>
+      {% endif %}
       {% endif %}
     </div>
   </div>
   <div class="fit-slot" id="fit-{{ j.id }}">
     {% if j.fit_detail %}{% with detail=j.fit_detail %}{% include '_fitblock.html' %}{% endwith %}{% endif %}
+  </div>
+  <div class="tailor-slot" id="tailor-{{ j.id }}">
+    {% if j.tailored %}
+    <div class="row" style="margin-top:8px;gap:10px;align-items:center">
+      <a class="btn sm green" href="{{ url_for('job_cv_download', job_id=j.id) }}">⬇ CV a medida (PDF)</a>
+      <span class="muted" style="font-size:12px">ya generado · pulsa «🎯 CV a medida» para rehacerlo</span>
+    </div>
+    {% endif %}
   </div>
 </div>
 {% else %}
@@ -178,6 +190,50 @@
           ta.value=d.text;
           box.appendChild(lbl); box.appendChild(ta); slot.appendChild(box);
         }).catch(function(){ unspin(b); });
+    });
+  });
+  // --- CV a medida de una vacante (optimización ATS) ---
+  var CV_LANGS = {{ cv_langs|tojson }};
+  document.querySelectorAll('.tailor-btn').forEach(function(b){
+    b.addEventListener('click',function(){
+      var id=b.dataset.id, slot=document.getElementById('tailor-'+id);
+      if(slot.querySelector('.tailor-panel')) return;   // ya está abierto
+      var p=document.createElement('div');
+      p.className='tailor-panel';
+      p.style.cssText='margin-top:10px;padding:14px;background:var(--card2);border-radius:10px;border-left:3px solid var(--accent2)';
+      var langSel = CV_LANGS.length>1
+        ? '<select class="tl-lang" style="padding:7px 10px">'+CV_LANGS.map(function(l){
+            return '<option value="'+l+'">'+(l==='es'?'Español':'English')+'</option>';}).join('')+'</select>'
+        : '<input type="hidden" class="tl-lang" value="'+(CV_LANGS[0]||'es')+'">';
+      p.innerHTML =
+        '<div style="font-size:13px;font-weight:600;margin-bottom:4px">🎯 Adaptar mi CV a esta vacante</div>'+
+        '<div class="muted" style="font-size:12px;margin-bottom:8px">Pega la <b>descripción de la oferta</b>: de ahí salen las keywords reales que busca el ATS. '+
+        'Es opcional, pero mejora mucho el resultado. Tu CV generado es la base y <b>no se inventan datos</b>.</div>'+
+        '<textarea class="tl-jd" rows="6" placeholder="Pega aquí la descripción / requisitos de la vacante…" '+
+        'style="width:100%;background:var(--card);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:9px;font:inherit;resize:vertical"></textarea>'+
+        '<div class="row" style="margin-top:10px;gap:10px;align-items:center">'+langSel+
+        '<button type="button" class="btn sm green tl-go">Generar CV a medida</button>'+
+        '<button type="button" class="btn sm ghost tl-cancel">Cancelar</button></div>';
+      slot.appendChild(p);
+      p.querySelector('.tl-cancel').addEventListener('click',function(){ p.remove(); });
+      p.querySelector('.tl-go').addEventListener('click',function(){
+        var go=p.querySelector('.tl-go');
+        spin(go,'Adaptando…');
+        var fd=new FormData();
+        fd.append('jd', p.querySelector('.tl-jd').value);
+        fd.append('lang', p.querySelector('.tl-lang').value);
+        fetch('/jobs/'+id+'/tailor',{method:'POST',headers:{'X-Requested-With':'fetch'},body:fd})
+          .then(function(r){return r.json();}).then(function(d){
+            unspin(go);
+            if(d.ok){ slot.innerHTML=d.html; }
+            else{
+              var e=document.createElement('div');
+              e.className='muted'; e.style.cssText='margin-top:8px;color:var(--warn)';
+              e.textContent=d.error||'No se pudo generar. Reintenta.';
+              p.appendChild(e);
+            }
+          }).catch(function(){ unspin(go); });
+      });
     });
   });
   // spinner al recalcular afinidad (POST síncrono largo)

@@ -89,6 +89,15 @@ CREATE TABLE IF NOT EXISTS job_matches(
     fit_detail TEXT,
     updated_at TEXT DEFAULT (datetime('now','localtime'))
 );
+CREATE TABLE IF NOT EXISTS tailored_cvs(
+    job_id     INTEGER PRIMARY KEY REFERENCES jobs(id) ON DELETE CASCADE,
+    lang       TEXT,
+    cv         TEXT,
+    notes      TEXT,
+    ats_score  INTEGER,
+    job_desc   TEXT,
+    updated_at TEXT DEFAULT (datetime('now','localtime'))
+);
 CREATE INDEX IF NOT EXISTS idx_jobs_posted ON jobs(posted_ts DESC);
 """
 

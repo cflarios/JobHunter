@@ -84,8 +84,8 @@
 <div class="card" style="border-color:var(--accent2)">
   <div class="row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
     <div>
-      <h3 style="margin:0 0 4px">Tu CV nuevo está listo</h3>
-      <p class="muted" style="margin:0;font-size:13px;max-width:60ch">CV reescrito por {{ ai_label }} aplicando las recomendaciones Harvard/ATS, en PDF (máx. 2 páginas). Revísalo y ajústalo a tu criterio antes de postular. Para cambiar el idioma, vuelve a generarlo arriba.</p>
+      <h3 style="margin:0 0 4px">Tu CV nuevo está listo <span class="pill" style="color:var(--accent2);vertical-align:middle">✦ es tu referencia</span></h3>
+      <p class="muted" style="margin:0;font-size:13px;max-width:60ch">CV reescrito por {{ ai_label }} aplicando las recomendaciones Harvard/ATS, en PDF (máx. 2 páginas). <b>Este CV es el que el sistema usa como referencia</b> para calcular la afinidad de las vacantes, el «¿encajo aquí?» y las cartas. Además, en cada vacante puedes pulsar <b>«🎯 CV a medida»</b> para adaptarlo a esa oferta y maximizar el paso por el ATS. Para cambiar el idioma, vuelve a generarlo arriba.</p>
     </div>
     <div class="row" style="gap:10px">
       {% for lg in cv_langs %}

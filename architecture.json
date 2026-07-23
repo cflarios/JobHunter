@@ -3,15 +3,23 @@
   "description": "Buscador personal de empleos remotos auto-alojado en una Raspberry Pi, con emparejamiento de CV por IA. Enfocado en DevOps/SRE remoto (contractor desde Colombia), ampliable a cualquier rol.",
   "generated": "2026-07-23",
   "host": "Raspberry Pi (Debian 13, Python 3.13) — http://192.168.1.11:8080",
-  "stack": ["Python 3.13", "Flask", "SQLite (WAL)", "systemd", "Claude/Gemini API", "SMTP (email)", "Telegram Bot API"],
+  "stack": [
+    "Python 3.13",
+    "Flask",
+    "SQLite (WAL)",
+    "systemd",
+    "Claude/Gemini API",
+    "SMTP (email)",
+    "Telegram Bot API"
+  ],
   "metrics": {
     "sources": 11,
-    "db_tables": 8,
-    "http_routes": 28,
+    "db_tables": 9,
+    "http_routes": 30,
     "python_lines": 2900,
-    "template_files": 9,
+    "template_files": 11,
     "systemd_units": 3,
-    "ai_features": 2,
+    "ai_features": 3,
     "notify_channels": 2
   },
   "layers": [
@@ -20,9 +28,18 @@
       "name": "Disparadores",
       "color": "blue",
       "components": [
-        { "name": "Planificador in-app", "detail": "hilo demonio de la app web (app._scheduler): cada minuto lanza run_all() a las horas de settings.search_times (una o varias, configurables en Configuración; por defecto 12:00 America/Bogota) y comprueba el resumen diario. Idempotente vía last_scheduled_run" },
-        { "name": "jobhunter-search.timer (desactivado)", "detail": "el timer systemd fijo a las 12:00 quedó DESACTIVADO; superado por el planificador in-app configurable. Unidades en deploy/ como referencia" },
-        { "name": "Usuario · Buscar ahora", "detail": "POST /run desde la UI, manual (o systemctl start jobhunter-search.service)" }
+        {
+          "name": "Planificador in-app",
+          "detail": "hilo demonio de la app web (app._scheduler): cada minuto lanza run_all() a las horas de settings.search_times (una o varias, configurables en Configuración; por defecto 12:00 America/Bogota) y comprueba el resumen diario. Idempotente vía last_scheduled_run"
+        },
+        {
+          "name": "jobhunter-search.timer (desactivado)",
+          "detail": "el timer systemd fijo a las 12:00 quedó DESACTIVADO; superado por el planificador in-app configurable. Unidades en deploy/ como referencia"
+        },
+        {
+          "name": "Usuario · Buscar ahora",
+          "detail": "POST /run desde la UI, manual (o systemctl start jobhunter-search.service)"
+        }
       ]
     },
     {
@@ -30,9 +47,18 @@
       "name": "Ingesta / Orquestación",
       "color": "blue",
       "components": [
-        { "name": "run_search.sh", "detail": "wrapper del cron; registra en search.log" },
-        { "name": "fetcher.run_all()", "detail": "recorre búsquedas activas y aplica ventana/modo por búsqueda" },
-        { "name": "fetcher.run_search()", "detail": "consulta las 11 fuentes, filtra, deduplica, inserta y notifica" }
+        {
+          "name": "run_search.sh",
+          "detail": "wrapper para corridas manuales; registra en search.log"
+        },
+        {
+          "name": "fetcher.run_all()",
+          "detail": "recorre búsquedas activas y aplica ventana/modo por búsqueda"
+        },
+        {
+          "name": "fetcher.run_search()",
+          "detail": "consulta las 11 fuentes, filtra, deduplica, inserta y devuelve los empleos nuevos"
+        }
       ]
     },
     {
@@ -40,17 +66,50 @@
       "name": "Fuentes (11): 10 públicas sin key + LinkedIn vía RapidAPI",
       "color": "blue",
       "components": [
-        { "name": "Remotive", "detail": "API JSON, search=query" },
-        { "name": "RemoteOK", "detail": "API JSON, feed completo" },
-        { "name": "Jobicy", "detail": "API JSON, tag=query" },
-        { "name": "Himalayas", "detail": "API JSON" },
-        { "name": "WeWorkRemotely", "detail": "RSS: DevOps/Sysadmin + Programming" },
-        { "name": "Arbeitnow", "detail": "API JSON (solo remotos)" },
-        { "name": "The Muse", "detail": "API JSON, location=Flexible/Remote" },
-        { "name": "Working Nomads", "detail": "API JSON" },
-        { "name": "Landing.jobs", "detail": "API JSON (incluye salario)" },
-        { "name": "Get on Board", "detail": "API JSON /api/v0 (LATAM, salario USD); empresa vía /companies/{id}" },
-        { "name": "LinkedIn (RapidAPI)", "detail": "linkedin-job-search-api /active-jb; salario, modalidad y skills. Helper genérico _rapidapi_get() para más APIs de RapidAPI. Requiere RAPIDAPI_KEY" }
+        {
+          "name": "Remotive",
+          "detail": "API JSON, search=query"
+        },
+        {
+          "name": "RemoteOK",
+          "detail": "API JSON, feed completo"
+        },
+        {
+          "name": "Jobicy",
+          "detail": "API JSON, tag=query"
+        },
+        {
+          "name": "Himalayas",
+          "detail": "API JSON"
+        },
+        {
+          "name": "WeWorkRemotely",
+          "detail": "RSS: DevOps/Sysadmin + Programming"
+        },
+        {
+          "name": "Arbeitnow",
+          "detail": "API JSON (solo remotos)"
+        },
+        {
+          "name": "The Muse",
+          "detail": "API JSON, location=Flexible/Remote"
+        },
+        {
+          "name": "Working Nomads",
+          "detail": "API JSON"
+        },
+        {
+          "name": "Landing.jobs",
+          "detail": "API JSON (incluye salario)"
+        },
+        {
+          "name": "Get on Board",
+          "detail": "API JSON /api/v0 (LATAM, salario USD); empresa vía /companies/{id}"
+        },
+        {
+          "name": "LinkedIn (RapidAPI)",
+          "detail": "linkedin-job-search-api /active-jb; salario, modalidad y skills. Helper genérico _rapidapi_get() para más APIs de RapidAPI. Requiere RAPIDAPI_KEY"
+        }
       ]
     },
     {
@@ -58,11 +117,26 @@
       "name": "Pipeline de filtros (uniforme a todas las fuentes)",
       "color": "green",
       "components": [
-        { "name": "blacklist de empresas", "detail": "descarta empleos cuya empresa esté en blocked_companies (case-insensitive); gestionable desde Compañías" },
-        { "name": "title_ok()", "detail": "el TÍTULO debe contener alguna palabra clave del rol (p. ej. devops, sre, site reliability)" },
-        { "name": "location_ok()", "detail": "modo worldwide (por defecto) / americas / any; descarta locks a país/estado que excluyen a Colombia" },
-        { "name": "ventana de días", "detail": "posted_ts dentro de max_age_days (por búsqueda o global)" },
-        { "name": "dedup", "detail": "INSERT OR IGNORE por URL única" }
+        {
+          "name": "blacklist de empresas",
+          "detail": "descarta empleos cuya empresa esté en blocked_companies (case-insensitive); gestionable desde Compañías"
+        },
+        {
+          "name": "title_ok()",
+          "detail": "el TÍTULO debe contener alguna palabra clave del rol (p. ej. devops, sre, site reliability)"
+        },
+        {
+          "name": "location_ok()",
+          "detail": "modo worldwide (por defecto) / americas / any; descarta locks a país/estado que excluyen a Colombia"
+        },
+        {
+          "name": "ventana de días",
+          "detail": "posted_ts dentro de max_age_days (por búsqueda o global)"
+        },
+        {
+          "name": "dedup",
+          "detail": "INSERT OR IGNORE por URL única"
+        }
       ]
     },
     {
@@ -70,7 +144,10 @@
       "name": "Almacenamiento",
       "color": "green",
       "components": [
-        { "name": "SQLite jobs.db (WAL)", "detail": "db.py; 7 tablas" }
+        {
+          "name": "SQLite jobs.db (WAL)",
+          "detail": "db.py; 9 tablas"
+        }
       ]
     },
     {
@@ -78,9 +155,18 @@
       "name": "Capa web (Flask)",
       "color": "violet",
       "components": [
-        { "name": "app.py", "detail": "rutas + filtro Markdown seguro + favicon SVG + mapas + página Configuración (/settings)" },
-        { "name": "notifier.py", "detail": "notificaciones multi-canal (email SMTP con HTML estético + Telegram Bot API) y multi-modo (inmediato tras búsqueda / resumen diario a hora fija). Despacha a todos los canales activos; secretos cifrados vía keystore. El resumen diario lo dispara un hilo demonio de la app web (maybe_send_digest, idempotente)" },
-        { "name": "templates/", "detail": "Jinja2: base, index, searches, settings, notifications, companies, cv, _review, _fitblock" }
+        {
+          "name": "app.py",
+          "detail": "rutas + filtro Markdown seguro + favicon SVG + mapas + página Configuración (/settings)"
+        },
+        {
+          "name": "notifier.py",
+          "detail": "notificaciones multi-canal (email SMTP con HTML estético + Telegram Bot API) y multi-modo (inmediato tras búsqueda / resumen diario a hora fija). Despacha a todos los canales activos; secretos cifrados vía keystore. El resumen diario lo dispara un hilo demonio de la app web (maybe_send_digest, idempotente)"
+        },
+        {
+          "name": "templates/",
+          "detail": "Jinja2: base, index, searches, settings, blacklist, notifications, companies, cv, _review, _fitblock, _tailorblock"
+        }
       ]
     },
     {
@@ -88,10 +174,22 @@
       "name": "Cliente (navegador)",
       "color": "violet",
       "components": [
-        { "name": "Empleos", "detail": "lista + filtros + % de afinidad + barra de 'empleos nuevos' (sondeo 45s)" },
-        { "name": "Compañías", "detail": "empleadores reales + Glassdoor + resumen AJAX con spinner" },
-        { "name": "Mi CV", "detail": "subir CV, perfil, afinidad, ¿encajo?, carta, mejora de CV" },
-        { "name": "Notificaciones", "detail": "badge que sondea /api/unread cada 30s" }
+        {
+          "name": "Empleos",
+          "detail": "lista + filtros + % de afinidad + barra de 'empleos nuevos' (sondeo 45s) + botón «CV a medida» por vacante"
+        },
+        {
+          "name": "Compañías",
+          "detail": "empleadores reales + Glassdoor + resumen AJAX con spinner"
+        },
+        {
+          "name": "Mi CV",
+          "detail": "subir CV, perfil, afinidad, ¿encajo?, carta, mejora y CV nuevo; el CV generado es la referencia del matching"
+        },
+        {
+          "name": "Notificaciones",
+          "detail": "badge que sondea /api/unread cada 30s"
+        }
       ]
     },
     {
@@ -99,18 +197,58 @@
       "name": "IA · proveedor seleccionable (Claude / Gemini)",
       "color": "amber",
       "components": [
-        { "name": "llm.py (router)", "detail": "capa única complete(parts, json_out, max_tokens, web_search) → enruta a Claude o Gemini según settings.ai_provider (por defecto claude; env AI_PROVIDER en runs manuales). Traduce parts estilo Gemini a bloques de Claude" },
-        { "name": "Claude (Anthropic)", "detail": "modelo claude-opus-4-8 (override ANTHROPIC_MODEL). Búsqueda web = herramienta de servidor web_search_20260209; maneja pause_turn. Sin thinking (más barato)" },
-        { "name": "Gemini (Google)", "detail": "gemini-2.5-flash; grounding tools:[{google_search}]; thinkingBudget=0 + maxOutputTokens holgado para no truncar" },
-        { "name": "reviews.py", "detail": "resumen de reputación de empresas con búsqueda web/grounding (Glassdoor); _parse() limpia citas de ambos proveedores" },
-        { "name": "cv.py · analyze_cv", "detail": "extrae perfil del CV (PDF inline o texto): rol, seniority, años, skills, keywords" },
-        { "name": "cv.py · match_jobs", "detail": "puntúa cada empleo 0–100 contra el perfil (badge y orden en Empleos)" },
-        { "name": "cv.py · analyze_fit", "detail": "¿Encajo aquí? por oferta: coincidencias, gaps y qué resaltar" },
-        { "name": "cv.py · cover_letter", "detail": "carta de presentación a medida por oferta" },
-        { "name": "cv.py · improve_cv", "detail": "feedback estilo Harvard/ATS + resumen y logros reescritos" },
-        { "name": "cv.py · build_cv(lang)", "detail": "genera un CV NUEVO en JSON estructurado aplicando las recomendaciones; no inventa datos. Idioma es/en/ambos (elegible en la UI). Se cachea en profile.generated_cv como {lang: cv}" },
-        { "name": "cvpdf.py (fpdf2)", "detail": "renderiza el CV nuevo a PDF (DejaVu Sans para acentos); títulos de sección localizados (es/en); garantiza ≤2 páginas con doble pase. /cv/download?lang= lo sirve como adjunto" },
-        { "name": "ANTHROPIC_API_KEY / GEMINI_API_KEY", "detail": "cada proveedor su propia clave en .env (600, fuera del repo); si falta la del activo, degrada con mensaje" }
+        {
+          "name": "llm.py (router)",
+          "detail": "capa única complete(parts, json_out, max_tokens, web_search) → enruta a Claude o Gemini según settings.ai_provider (por defecto claude; env AI_PROVIDER en runs manuales). Traduce parts estilo Gemini a bloques de Claude"
+        },
+        {
+          "name": "Claude (Anthropic)",
+          "detail": "modelo claude-opus-4-8 (override ANTHROPIC_MODEL). Búsqueda web = herramienta de servidor web_search_20260209; maneja pause_turn. Sin thinking (más barato)"
+        },
+        {
+          "name": "Gemini (Google)",
+          "detail": "gemini-2.5-flash; grounding tools:[{google_search}]; thinkingBudget=0 + maxOutputTokens holgado para no truncar"
+        },
+        {
+          "name": "reviews.py",
+          "detail": "resumen de reputación de empresas con búsqueda web/grounding (Glassdoor); _parse() limpia citas de ambos proveedores"
+        },
+        {
+          "name": "cv.py · analyze_cv",
+          "detail": "extrae perfil del CV (PDF inline o texto): rol, seniority, años, skills, keywords"
+        },
+        {
+          "name": "cv.py · match_jobs",
+          "detail": "puntúa cada empleo 0–100 contra el CV GENERADO (reference_blob), no contra los campos sueltos del perfil; badge y orden en Empleos"
+        },
+        {
+          "name": "cv.py · analyze_fit",
+          "detail": "¿Encajo aquí? por oferta: coincidencias, gaps y qué resaltar"
+        },
+        {
+          "name": "cv.py · cover_letter",
+          "detail": "carta de presentación a medida por oferta"
+        },
+        {
+          "name": "cv.py · improve_cv",
+          "detail": "feedback estilo Harvard/ATS + resumen y logros reescritos"
+        },
+        {
+          "name": "cv.py · build_cv(lang)",
+          "detail": "genera un CV NUEVO en JSON estructurado aplicando las recomendaciones; no inventa datos. Idioma es/en/ambos (elegible en la UI). Se cachea en profile.generated_cv como {lang: cv}"
+        },
+        {
+          "name": "cvpdf.py (fpdf2)",
+          "detail": "renderiza el CV nuevo a PDF (DejaVu Sans para acentos); títulos de sección localizados (es/en); garantiza ≤2 páginas con doble pase. /cv/download?lang= lo sirve como adjunto"
+        },
+        {
+          "name": "ANTHROPIC_API_KEY / GEMINI_API_KEY",
+          "detail": "cada proveedor su propia clave en .env (600, fuera del repo); si falta la del activo, degrada con mensaje"
+        },
+        {
+          "name": "cv.py · tailor_cv + _enforce_facts",
+          "detail": "CV a medida de UNA vacante (optimización ATS) partiendo del CV generado: reordena skills, reformula viñetas con la terminología de la oferta, reescribe titular/resumen. El usuario puede pegar la descripción de la oferta (de ahí salen las keywords reales). _enforce_facts blinda en CÓDIGO los hechos comprobables (cargo, empresa, período, orden cronológico, educación, certificaciones, contacto) restaurándolos del CV base: la IA no siempre respeta el prompt"
+        }
       ]
     }
   ],
@@ -125,61 +263,267 @@
     "Toda la IA pasa por llm.py, que enruta al proveedor activo (Claude por defecto, o Gemini) según settings.ai_provider",
     "Compañías: botón → POST /companies/summary → reviews.py → llm.py → proveedor (búsqueda web/grounding) → company_reviews → HTML (AJAX)",
     "Mi CV: subir CV → POST /cv/analyze → cv.py → llm.py → proveedor → tabla profile",
-    "POST /cv/match → cv.py.match_jobs(perfil, jobs) → llm.py → tabla job_matches → Empleos ordenado por afinidad",
+    "POST /cv/match → cv.py.match_jobs(CV generado como referencia, jobs) → llm.py → tabla job_matches → Empleos ordenado por afinidad",
     "Por oferta: /jobs/{id}/fit (¿encajo?) y /jobs/{id}/cover (carta) → cv.py → llm.py → AJAX",
     "/cv/improve → mejora del CV (Harvard/ATS) → profile.feedback + profile.rewrite",
-    "/cv/build → cv.build_cv → llm.py → CV nuevo (JSON) en profile.generated_cv; /cv/download → cvpdf.py → PDF ≤2 págs descargable"
+    "/cv/build → cv.build_cv → llm.py → CV nuevo (JSON) en profile.generated_cv; /cv/download → cvpdf.py → PDF ≤2 págs descargable",
+    "Empleos: botón «CV a medida» → POST /jobs/{id}/tailor → cv.tailor_cv(CV generado + vacante + descripción pegada) → _enforce_facts → tabla tailored_cvs → PDF en /jobs/{id}/cv.pdf"
   ],
   "db_schema": {
-    "searches": ["id", "query", "title_keywords", "max_age_days", "active", "created_at"],
-    "blocked_companies": ["name (PK, COLLATE NOCASE)", "created_at"],
-    "jobs": ["id", "search_id→searches", "title", "company", "url (unique)", "source", "salary", "location", "date_posted", "posted_ts", "found_at", "is_new"],
-    "notifications": ["id", "message", "created_at", "read"],
-    "settings": ["key", "value"],
-    "company_reviews": ["company", "summary", "resolved_name", "status", "generated_at"],
-    "profile": ["id (=1)", "cv_text", "role", "seniority", "years", "skills", "summary", "suggested_keywords", "feedback", "rewrite", "generated_cv", "updated_at"],
-    "job_matches": ["job_id→jobs", "score", "reason", "fit_detail", "updated_at"]
+    "searches": [
+      "id",
+      "query",
+      "title_keywords",
+      "max_age_days",
+      "active",
+      "created_at"
+    ],
+    "blocked_companies": [
+      "name (PK, COLLATE NOCASE)",
+      "created_at"
+    ],
+    "jobs": [
+      "id",
+      "search_id→searches",
+      "title",
+      "company",
+      "url (unique)",
+      "source",
+      "salary",
+      "location",
+      "date_posted",
+      "posted_ts",
+      "found_at",
+      "is_new"
+    ],
+    "notifications": [
+      "id",
+      "message",
+      "created_at",
+      "read"
+    ],
+    "settings": [
+      "key",
+      "value"
+    ],
+    "company_reviews": [
+      "company",
+      "summary",
+      "resolved_name",
+      "status",
+      "generated_at"
+    ],
+    "profile": [
+      "id (=1)",
+      "cv_text",
+      "role",
+      "seniority",
+      "years",
+      "skills",
+      "summary",
+      "suggested_keywords",
+      "feedback",
+      "rewrite",
+      "generated_cv",
+      "updated_at"
+    ],
+    "job_matches": [
+      "job_id→jobs",
+      "score",
+      "reason",
+      "fit_detail",
+      "updated_at"
+    ],
+    "tailored_cvs": [
+      "job_id (PK→jobs)",
+      "lang",
+      "cv (JSON del CV adaptado)",
+      "notes",
+      "ats_score",
+      "job_desc",
+      "updated_at"
+    ]
   },
   "routes": [
-    { "path": "/", "method": "GET", "purpose": "Empleos: lista + filtros + % de afinidad + orden por afinidad" },
-    { "path": "/run", "method": "POST", "purpose": "Buscar ahora (todas las activas o una)" },
-    { "path": "/mark-seen", "method": "POST", "purpose": "Marca todos los empleos como vistos" },
-    { "path": "/searches", "method": "GET/POST", "purpose": "Búsquedas: alta, keywords de título, modo ubicación, ventana global, interruptor RapidAPI" },
-    { "path": "/settings", "method": "GET/POST", "purpose": "Configuración: proveedor de IA + claves de API + notificaciones multi-canal (email/SMTP + Telegram) y modos (inmediato / resumen diario) + programación de búsquedas (horarios del planificador, una o varias horas); secretos cifrados, envío de prueba" },
-    { "path": "/notifications", "method": "GET", "purpose": "Historial (marca leídas)" },
-    { "path": "/companies", "method": "GET", "purpose": "Empleadores reales agregados del campo company" },
-    { "path": "/companies/summary", "method": "POST", "purpose": "Resumen de opiniones vía IA (proveedor activo, JSON si AJAX)" },
-    { "path": "/companies/block · /companies/unblock", "method": "POST", "purpose": "Blacklist: bloquear (borra sus ofertas) / desbloquear una empresa" },
-    { "path": "/cv", "method": "GET", "purpose": "Mi CV: subir, perfil, afinidad, mejora" },
-    { "path": "/cv/analyze", "method": "POST", "purpose": "Analiza el CV (PDF/texto) → perfil" },
-    { "path": "/cv/match", "method": "POST", "purpose": "Puntúa todos los empleos contra el perfil" },
-    { "path": "/cv/improve", "method": "POST", "purpose": "Mejora del CV (Harvard/ATS)" },
-    { "path": "/cv/build", "method": "POST", "purpose": "Genera un CV nuevo (JSON) aplicando las recomendaciones" },
-    { "path": "/cv/download?lang=", "method": "GET", "purpose": "Descarga el CV nuevo en PDF (es/en, ≤2 páginas)" },
-    { "path": "/cv/apply-keywords", "method": "POST", "purpose": "Aplica keywords sugeridas a la búsqueda activa" },
-    { "path": "/jobs/<id>/fit", "method": "POST", "purpose": "¿Encajo aquí? — análisis oferta vs CV (AJAX)" },
-    { "path": "/jobs/<id>/cover", "method": "POST", "purpose": "Carta de presentación a medida (AJAX)" },
-    { "path": "/architecture · /workflow", "method": "GET", "purpose": "Mapas de arquitectura y flujo" },
-    { "path": "/api/unread · /api/jobs-status", "method": "GET", "purpose": "Polling: notificaciones y empleos nuevos" }
+    {
+      "path": "/",
+      "method": "GET",
+      "purpose": "Empleos: lista + filtros + % de afinidad + orden por afinidad"
+    },
+    {
+      "path": "/run",
+      "method": "POST",
+      "purpose": "Buscar ahora (todas las activas o una)"
+    },
+    {
+      "path": "/mark-seen",
+      "method": "POST",
+      "purpose": "Marca todos los empleos como vistos"
+    },
+    {
+      "path": "/searches",
+      "method": "GET/POST",
+      "purpose": "Búsquedas: alta, keywords de título, modo ubicación, ventana global, interruptor RapidAPI"
+    },
+    {
+      "path": "/settings",
+      "method": "GET/POST",
+      "purpose": "Configuración: proveedor de IA + claves de API + notificaciones multi-canal (email/SMTP + Telegram) y modos (inmediato / resumen diario) + programación de búsquedas (horarios del planificador, una o varias horas); secretos cifrados, envío de prueba"
+    },
+    {
+      "path": "/notifications",
+      "method": "GET",
+      "purpose": "Historial (marca leídas)"
+    },
+    {
+      "path": "/companies",
+      "method": "GET",
+      "purpose": "Empleadores reales agregados del campo company"
+    },
+    {
+      "path": "/companies/summary",
+      "method": "POST",
+      "purpose": "Resumen de opiniones vía IA (proveedor activo, JSON si AJAX)"
+    },
+    {
+      "path": "/companies/block · /companies/unblock",
+      "method": "POST",
+      "purpose": "Blacklist: bloquear (borra sus ofertas) / desbloquear una empresa"
+    },
+    {
+      "path": "/cv",
+      "method": "GET",
+      "purpose": "Mi CV: subir, perfil, afinidad, mejora"
+    },
+    {
+      "path": "/cv/analyze",
+      "method": "POST",
+      "purpose": "Analiza el CV (PDF/texto) → perfil"
+    },
+    {
+      "path": "/cv/match",
+      "method": "POST",
+      "purpose": "Puntúa todos los empleos contra el perfil"
+    },
+    {
+      "path": "/cv/improve",
+      "method": "POST",
+      "purpose": "Mejora del CV (Harvard/ATS)"
+    },
+    {
+      "path": "/cv/build",
+      "method": "POST",
+      "purpose": "Genera un CV nuevo (JSON) aplicando las recomendaciones"
+    },
+    {
+      "path": "/cv/download?lang=",
+      "method": "GET",
+      "purpose": "Descarga el CV nuevo en PDF (es/en, ≤2 páginas)"
+    },
+    {
+      "path": "/cv/apply-keywords",
+      "method": "POST",
+      "purpose": "Aplica keywords sugeridas a la búsqueda activa"
+    },
+    {
+      "path": "/jobs/<id>/fit",
+      "method": "POST",
+      "purpose": "¿Encajo aquí? — análisis oferta vs CV (AJAX)"
+    },
+    {
+      "path": "/jobs/<id>/cover",
+      "method": "POST",
+      "purpose": "Carta de presentación a medida (AJAX)"
+    },
+    {
+      "path": "/architecture · /workflow",
+      "method": "GET",
+      "purpose": "Mapas de arquitectura y flujo"
+    },
+    {
+      "path": "/api/unread · /api/jobs-status",
+      "method": "GET",
+      "purpose": "Polling: notificaciones y empleos nuevos"
+    },
+    {
+      "path": "/jobs/<id>/tailor",
+      "method": "POST",
+      "purpose": "CV a medida de esa vacante (ATS), AJAX; acepta la descripción pegada de la oferta"
+    },
+    {
+      "path": "/jobs/<id>/cv.pdf",
+      "method": "GET",
+      "purpose": "Descarga el CV a medida de esa vacante en PDF"
+    }
   ],
   "deployment": {
-    "web_service": { "unit": "jobhunter-web.service", "exec": ".venv/bin/python app.py", "port": 8080, "restart": "on-failure" },
-    "search_service": { "unit": "jobhunter-search.service", "exec": "run_search.sh", "type": "oneshot", "note": "solo corridas manuales; el disparo automático lo hace el planificador in-app" },
-    "search_timer": { "unit": "jobhunter-search.timer", "schedule": "DESACTIVADO — superado por el planificador in-app (settings.search_times, configurable)", "persistent": true },
-    "in_app_scheduler": { "host": "hilo demonio del web service (app._scheduler)", "runs": "run_all() a las horas de settings.search_times (configurables, multi-hora) + resumen diario (notifier.maybe_send_digest)" }
+    "web_service": {
+      "unit": "jobhunter-web.service",
+      "exec": ".venv/bin/python app.py",
+      "port": 8080,
+      "restart": "on-failure"
+    },
+    "search_service": {
+      "unit": "jobhunter-search.service",
+      "exec": "run_search.sh",
+      "type": "oneshot",
+      "note": "solo corridas manuales; el disparo automático lo hace el planificador in-app"
+    },
+    "search_timer": {
+      "unit": "jobhunter-search.timer",
+      "schedule": "DESACTIVADO — superado por el planificador in-app (settings.search_times, configurable)",
+      "persistent": true
+    },
+    "in_app_scheduler": {
+      "host": "hilo demonio del web service (app._scheduler)",
+      "runs": "run_all() a las horas de settings.search_times (configurables, multi-hora) + resumen diario (notifier.maybe_send_digest)"
+    }
   },
   "files": [
-    { "file": "db.py", "role": "Esquema y helpers de SQLite (7 tablas)" },
-    { "file": "fetcher.py", "role": "11 fuentes (10 públicas + LinkedIn RapidAPI), helper _rapidapi_get, filtros, orquestación" },
-    { "file": "app.py", "role": "Servidor Flask, 22 rutas, filtro Markdown, favicon, mapas" },
-    { "file": "llm.py", "role": "Capa de proveedor de IA: enruta a Claude o Gemini según settings.ai_provider" },
-    { "file": "notifier.py", "role": "Notificaciones multi-canal (email SMTP + Telegram) y multi-modo (inmediato / resumen diario); secretos cifrados (keystore)" },
-    { "file": "reviews.py", "role": "Resumen de opiniones de empresas vía IA (llm.py) + búsqueda web" },
-    { "file": "cv.py", "role": "CV + IA: analizar, match, ¿encajo?, carta, mejora, generar CV (llm.py)" },
-    { "file": "cvpdf.py", "role": "Renderiza el CV nuevo a PDF (fpdf2 + DejaVu, ≤2 páginas)" },
-    { "file": "run_search.sh", "role": "Wrapper del cron con logging" },
-    { "file": "templates/", "role": "8 vistas Jinja2" },
-    { "file": "deploy/", "role": "Unidades systemd (referencia)" }
+    {
+      "file": "db.py",
+      "role": "Esquema y helpers de SQLite (7 tablas)"
+    },
+    {
+      "file": "fetcher.py",
+      "role": "11 fuentes (10 públicas + LinkedIn RapidAPI), helper _rapidapi_get, filtros, orquestación"
+    },
+    {
+      "file": "app.py",
+      "role": "Servidor Flask, 22 rutas, filtro Markdown, favicon, mapas"
+    },
+    {
+      "file": "llm.py",
+      "role": "Capa de proveedor de IA: enruta a Claude o Gemini según settings.ai_provider"
+    },
+    {
+      "file": "notifier.py",
+      "role": "Notificaciones multi-canal (email SMTP + Telegram) y multi-modo (inmediato / resumen diario); secretos cifrados (keystore)"
+    },
+    {
+      "file": "reviews.py",
+      "role": "Resumen de opiniones de empresas vía IA (llm.py) + búsqueda web"
+    },
+    {
+      "file": "cv.py",
+      "role": "CV + IA: analizar, match (usa el CV generado como referencia), ¿encajo?, carta, mejora, generar CV y CV a medida por vacante (ATS) con blindaje anti-alucinación"
+    },
+    {
+      "file": "cvpdf.py",
+      "role": "Renderiza el CV nuevo a PDF (fpdf2 + DejaVu, ≤2 páginas)"
+    },
+    {
+      "file": "run_search.sh",
+      "role": "Wrapper del cron con logging"
+    },
+    {
+      "file": "templates/",
+      "role": "8 vistas Jinja2"
+    },
+    {
+      "file": "deploy/",
+      "role": "Unidades systemd (referencia)"
+    }
   ],
   "security": [
     "Sin secretos en el repo: ANTHROPIC_API_KEY, GEMINI_API_KEY y RAPIDAPI_KEY viven en .env (600, gitignored). systemd los carga con EnvironmentFile; db.py como fallback",

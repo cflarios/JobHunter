@@ -43,17 +43,18 @@ replicamos **gratis** con Gemini (ver §7).
 ```
 job-hunter/
 ├── app.py              # Servidor Flask: rutas, filtro Markdown, favicon, mapas
-├── db.py               # Esquema SQLite (8 tablas) + carga de .env (fallback)
+├── db.py               # Esquema SQLite (9 tablas) + carga de .env (fallback)
 ├── fetcher.py          # 11 fuentes, filtros (título/ubicación/fecha), orquestación
 ├── skills.py           # Extracción de skills técnicas del texto (diccionario curado)
 ├── llm.py              # Capa de proveedor de IA: enruta a Claude o Gemini (ai_provider)
 ├── notifier.py         # Notificaciones de empleos nuevos (email SMTP + HTML estético)
 ├── reviews.py          # Resumen de reputación de empresas (IA + búsqueda web/grounding)
-├── cv.py               # CV + IA: analizar, match, ¿encajo?, carta, mejorar, generar CV
+├── cv.py               # CV + IA: analizar, match, ¿encajo?, carta, mejorar, generar CV,
+│                       #   CV a medida por vacante (ATS) + blindaje anti-alucinación
 ├── cvpdf.py            # Renderiza el CV nuevo a PDF (fpdf2 + DejaVu, ≤2 págs)
 ├── run_search.sh       # Wrapper del cron (→ fetcher.py, log en search.log)
-├── templates/          # 9 vistas Jinja2 (base, index, searches, settings,
-│                       #   notifications, companies, cv, _review, _fitblock)
+├── templates/          # 11 vistas Jinja2 (base, index, searches, settings, blacklist,
+│                       #   notifications, companies, cv, _review, _fitblock, _tailorblock)
 ├── deploy/             # Copia de referencia de las unidades systemd (sin secretos)
 ├── architecture.json   # Modelo estructurado del sistema (fuente de verdad)
 ├── architecture.html   # Mapa visual autocontenido (embebe el JSON)
@@ -203,11 +204,36 @@ Puede forzarse el proveedor con la env `AI_PROVIDER` en runs manuales.
   la URL (puede no coincidir); se re-resuelve al regenerar. Un regenerado que no
   halle URL **conserva** la previa.
 - **`cv.py`** — funciones inspiradas en reaver.ink:
+  - **`reference_blob(profile)` — el CV GENERADO es la referencia.** `match_jobs`,
+    `analyze_fit` y `cover_letter` ya no puntúan contra los campos sueltos del perfil,
+    sino contra el **CV generado** (`build_cv`), mucho más rico: titular, resumen,
+    skills, experiencia con logros (`generated_cvs()` + `cv_blob()`). Si aún no hay CV
+    generado, cae al `profile_blob` de siempre. `improve_cv` **sigue** usando
+    `profile_blob` a propósito: mejora el CV original, no debe realimentarse de su
+    propia salida.
   - `analyze_cv` (PDF inline o texto) → perfil (rol, seniority, años, skills, keywords).
   - `match_jobs` → afinidad 0–100 por empleo (badge y orden en Empleos).
   - `analyze_fit` → "¿Encajo aquí?" por oferta (coincidencias, gaps, qué resaltar).
   - `cover_letter` → carta de presentación a medida.
   - `improve_cv` → feedback Harvard/ATS + reescritura.
+  - **`tailor_cv(base_cv, job, lang, job_desc, profile)`** → **CV a medida de una
+    vacante** (optimización ATS). Parte del **CV generado** y lo adapta al puesto:
+    reordena skills, reformula viñetas con la terminología de la oferta, reescribe
+    titular y resumen. Devuelve `{cv, notes, ats_score}`; `notes` lista keywords
+    incorporadas, cambios y **gaps** (lo que la oferta pide y el CV no respalda —
+    se reporta, **nunca** se inventa). El usuario puede **pegar la descripción de la
+    oferta** (`job_desc`): es de donde salen las keywords reales del ATS, ya que no
+    guardamos la descripción de los empleos.
+  - **`_enforce_facts(base_cv, cv)` — red de seguridad anti-alucinación.** El prompt
+    prohíbe falsear datos, pero la IA **no siempre obedece** (en pruebas convirtió
+    "DevOps Engineer" en "Site Reliability Engineer" y reordenó experiencias). Por eso
+    **en código** se restauran desde el CV base: nombre y contacto, y por cada
+    experiencia **cargo, empresa, período y ubicación** (casadas por empresa), además
+    del **orden cronológico**; educación e idiomas se copian tal cual y las
+    certificaciones se filtran a las ya existentes. Una experiencia cuya empresa no
+    esté en el CV base se **descarta**. Lo legítimo (viñetas reformuladas, titular,
+    resumen, orden de skills) **se conserva**. Las correcciones aplicadas se muestran
+    al usuario en «🛡 Correcciones automáticas de integridad».
   - `build_cv(profile, lang)` → **CV NUEVO** en JSON estructurado (name/headline/
     contact/summary/skills/experience/education/certifications/languages) aplicando
     las recomendaciones. **No inventa** datos: usa solo lo real del CV/perfil, deja
@@ -284,7 +310,7 @@ usuario activa. `notifier` despacha a **todos los canales activos y bien configu
 
 ---
 
-## 8. Base de datos (SQLite `jobs.db`, WAL) — 8 tablas
+## 8. Base de datos (SQLite `jobs.db`, WAL) — 9 tablas
 
 | Tabla | Para qué |
 |---|---|
@@ -296,6 +322,7 @@ usuario activa. `notifier` despacha a **todos los canales activos y bien configu
 | `company_reviews` | Caché de resúmenes de empresa + resolved_name + glassdoor_url (página directa) |
 | `profile` | Perfil del CV (1 fila): cv_text, role, skills, summary, suggested_keywords, feedback, rewrite, generated_cv (JSON del CV nuevo) |
 | `job_matches` | Afinidad por empleo: score, reason, fit_detail |
+| `tailored_cvs` | CV a medida por vacante: job_id (PK→jobs), lang, cv (JSON), notes, ats_score, job_desc, updated_at |
 
 ---
 
@@ -309,7 +336,8 @@ Notificaciones `/notifications` · Compañías `/companies` (+ `/companies/summa
 `/companies/glassdoor-name`, `/companies/block`, `/companies/unblock`) ·
 **Bloqueos** `/blacklist` (blacklist de compañías, alta manual) ·
 **Mi CV** `/cv` (+ `/cv/analyze`, `/cv/match`, `/cv/improve`, `/cv/apply-keywords`,
-`/cv/build`, `/cv/download?lang=`) · por oferta `/jobs/<id>/fit` y `/cover` ·
+`/cv/build`, `/cv/download?lang=`) · por oferta `/jobs/<id>/fit`, `/cover`,
+**`/tailor`** (CV a medida ATS, AJAX) y **`/cv.pdf`** (descarga ese CV) ·
 mapas `/architecture` `/architecture.json` `/workflow` · polling `/api/unread`
 `/api/jobs-status`.
 
@@ -425,8 +453,10 @@ sudo systemctl restart jobhunter-web.service       # tras cambios en app/templat
   LinkedIn devuelve nombres completos de ciudades/países del mundo; se ampliaron
   mucho las listas, pero puede colarse algún remoto de un país no listado. En
   modo `worldwide` esto rinde **pocos** resultados de LinkedIn (muy geo-etiquetado).
-- **El match del CV usa solo el TÍTULO del empleo** (no guardamos la descripción).
-  Es suficiente para ranking, pero mejorable si algún día guardamos un extracto.
+- **Del lado del EMPLEO seguimos usando solo el TÍTULO** (no guardamos la
+  descripción). Del lado del CV la referencia ya es el **CV generado** completo
+  (`reference_blob`). Para el **CV a medida** se sortea la limitación pidiendo al
+  usuario que **pegue la descripción** de la oferta en el propio panel.
 - **La lista de empleos no se auto-refresca**; hay una barra "empleos nuevos"
   (sondeo 45s) que avisa y recarga a un clic. El badge de notificaciones sí se
   actualiza solo (30s).
