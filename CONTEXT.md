@@ -468,6 +468,14 @@ sudo systemctl restart jobhunter-web.service       # tras cambios en app/templat
 
 ## 13. Limitaciones y gotchas conocidos
 
+- **Panel lateral (base.html).** Los iconos son **SVG de línea monocromos** (macro
+  `ico()` en `base.html`), no emojis: los emojis traían color y pesos visuales
+  dispares y hacían que el panel se sintiera cargado pese a tener pocos ítems. El
+  activo se marca con **fondo tintado + icono en acento** (antes una barra dura).
+  **Bloqueos es una subsección de Compañías** (`.side-sub`, indentada con guía
+  vertical). La **documentación** (Arquitectura, Workflow, Repositorio) es una
+  **fila compacta de iconos** con tooltip, sin etiqueta ni filas completas. Al
+  contraer el panel, la subsección pierde la guía y la fila de docs se apila.
 - **El usuario edita la config en vivo desde la web** (ventana, keywords, modo).
   **No pisar sus ajustes** sin preguntar (ver memoria `jobhunter-live-settings`).
 - **RapidAPI: cuotas y propagación.** El plan gratuito/BASIC tiene cuota mensual
