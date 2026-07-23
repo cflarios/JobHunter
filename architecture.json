@@ -15,9 +15,9 @@
   "metrics": {
     "sources": 11,
     "db_tables": 9,
-    "http_routes": 30,
+    "http_routes": 34,
     "python_lines": 2900,
-    "template_files": 11,
+    "template_files": 12,
     "systemd_units": 3,
     "ai_features": 3,
     "notify_channels": 2
@@ -166,6 +166,10 @@
         {
           "name": "templates/",
           "detail": "Jinja2: base, index, searches, settings, blacklist, notifications, companies, cv, _review, _fitblock, _tailorblock"
+        },
+        {
+          "name": "applog.py",
+          "detail": "log central rotativo (logs/jobhunter.log, 512KB×3) compartido por el proceso web y las corridas de búsqueda; formato 'ts | nivel | origen | mensaje' parseable por la UI"
         }
       ]
     },
@@ -189,6 +193,10 @@
         {
           "name": "Notificaciones",
           "detail": "badge que sondea /api/unread cada 30s"
+        },
+        {
+          "name": "Logs",
+          "detail": "vista de consola en vivo (sondeo 5s) con 4 fuentes en pestañas: App, Búsquedas y journald de ambas unidades; filtros de nivel y texto, descarga y vaciado"
         }
       ]
     },
@@ -267,7 +275,8 @@
     "Por oferta: /jobs/{id}/fit (¿encajo?) y /jobs/{id}/cover (carta) → cv.py → llm.py → AJAX",
     "/cv/improve → mejora del CV (Harvard/ATS) → profile.feedback + profile.rewrite",
     "/cv/build → cv.build_cv → llm.py → CV nuevo (JSON) en profile.generated_cv; /cv/download → cvpdf.py → PDF ≤2 págs descargable",
-    "Empleos: botón «CV a medida» → POST /jobs/{id}/tailor → cv.tailor_cv(CV generado + vacante + descripción pegada) → _enforce_facts → tabla tailored_cvs → PDF en /jobs/{id}/cv.pdf"
+    "Empleos: botón «CV a medida» → POST /jobs/{id}/tailor → cv.tailor_cv(CV generado + vacante + descripción pegada) → _enforce_facts → tabla tailored_cvs → PDF en /jobs/{id}/cv.pdf",
+    "Todos los procesos → applog (logs/jobhunter.log) → /api/logs → consola en vivo en /logs"
   ],
   "db_schema": {
     "searches": [
@@ -454,6 +463,11 @@
       "path": "/jobs/<id>/cv.pdf",
       "method": "GET",
       "purpose": "Descarga el CV a medida de esa vacante en PDF"
+    },
+    {
+      "path": "/logs · /api/logs",
+      "method": "GET",
+      "purpose": "Consola de logs en la UI (App, Búsquedas, journald) con filtros de nivel/texto y modo en vivo"
     }
   ],
   "deployment": {
@@ -523,6 +537,10 @@
     {
       "file": "deploy/",
       "role": "Unidades systemd (referencia)"
+    },
+    {
+      "file": "applog.py",
+      "role": "Log central rotativo compartido entre procesos + helpers de lectura/parseo para la página de Logs"
     }
   ],
   "security": [

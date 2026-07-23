@@ -180,7 +180,7 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
     <div class="chips">
       <div class="chip"><div class="n">11</div><div class="l">Fuentes</div></div>
       <div class="chip"><div class="n">9</div><div class="l">Tablas SQLite</div></div>
-      <div class="chip"><div class="n">30</div><div class="l">Rutas HTTP</div></div>
+      <div class="chip"><div class="n">34</div><div class="l">Rutas HTTP</div></div>
       <div class="chip"><div class="n">2</div><div class="l">Canales de aviso</div></div>
       <div class="chip"><div class="n">~2.9k</div><div class="l">Líneas de código</div></div>
       <div class="chip"><div class="n">6</div><div class="l">Funciones IA</div></div>
@@ -291,6 +291,7 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
             <div class="node"><b>Empleos</b><span class="d">lista + filtros + barra "empleos nuevos" (sondeo 45s)</span></div>
             <div class="node"><b>Compañías</b><span class="d">empleadores + Glassdoor + resumen AJAX</span></div>
             <div class="node"><b>Configuración</b><span class="d">IA + claves + notificaciones + horarios de búsqueda</span></div>
+            <div class="node"><b>Logs</b><span class="d">consola en vivo: app, búsquedas y journald · filtros y modo tail</span></div>
             <div class="node"><b>Notificaciones</b><span class="d">badge sondea /api/unread cada 30s</span></div>
           </div>
         </div>
@@ -389,6 +390,7 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
         <tr><td class="path">/jobs/&lt;id&gt;/tailor</td><td class="method">POST</td><td>CV a medida de esa vacante (ATS) — acepta la descripción pegada de la oferta</td></tr>
         <tr><td class="path">/jobs/&lt;id&gt;/cv.pdf</td><td class="method">GET</td><td>Descarga el CV a medida de esa vacante en PDF</td></tr>
         <tr><td class="path">/architecture · /workflow</td><td class="method">GET</td><td>Mapas de arquitectura y flujo</td></tr>
+        <tr><td class="path">/logs · /api/logs</td><td class="method">GET</td><td>Consola de logs en la UI (app, búsquedas, journald) con filtros y modo en vivo</td></tr>
         <tr><td class="path">/api/unread · /api/jobs-status</td><td class="method">GET</td><td>Polling: notificaciones y empleos nuevos</td></tr>
       </tbody>
     </table></div>
@@ -434,6 +436,7 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
       <div class="card"><h3>jobhunter-web.service</h3><p><span class="k">.venv/bin/python app.py</span> · puerto 8080 · Restart=on-failure · arranca en el boot. <b>Aloja el planificador in-app</b>.</p></div>
       <div class="card"><h3>Planificador in-app</h3><p><span class="k">app._scheduler</span> · hilo demonio del web service · dispara las búsquedas a las horas de <span class="k">settings.search_times</span> (configurables) y el resumen diario · idempotente.</p></div>
       <div class="card"><h3>jobhunter-search.service</h3><p><span class="k">run_search.sh</span> · Type=oneshot · queda para <b>corridas manuales</b>.</p></div>
+      <div class="card"><h3>Log central 📟</h3><p><span class="k">applog.py</span> · <span class="k">logs/jobhunter.log</span> rotativo (512KB×3) compartido por el proceso web y las búsquedas; se consulta desde <b>/logs</b> con vista de consola.</p></div>
       <div class="card"><h3>jobhunter-search.timer</h3><p><span class="k">OnCalendar 12:00</span> · <b style="color:var(--faint)">DESACTIVADO</b> · superado por el planificador in-app (horario configurable desde la web).</p></div>
     </div>
   </section>
@@ -478,9 +481,9 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
   "metrics": {
     "sources": 11,
     "db_tables": 9,
-    "http_routes": 30,
+    "http_routes": 34,
     "python_lines": 2900,
-    "template_files": 11,
+    "template_files": 12,
     "systemd_units": 3,
     "ai_features": 3,
     "notify_channels": 2
@@ -629,6 +632,10 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
         {
           "name": "templates/",
           "detail": "Jinja2: base, index, searches, settings, blacklist, notifications, companies, cv, _review, _fitblock, _tailorblock"
+        },
+        {
+          "name": "applog.py",
+          "detail": "log central rotativo (logs/jobhunter.log, 512KB×3) compartido por el proceso web y las corridas de búsqueda; formato 'ts | nivel | origen | mensaje' parseable por la UI"
         }
       ]
     },
@@ -652,6 +659,10 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
         {
           "name": "Notificaciones",
           "detail": "badge que sondea /api/unread cada 30s"
+        },
+        {
+          "name": "Logs",
+          "detail": "vista de consola en vivo (sondeo 5s) con 4 fuentes en pestañas: App, Búsquedas y journald de ambas unidades; filtros de nivel y texto, descarga y vaciado"
         }
       ]
     },
@@ -730,7 +741,8 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
     "Por oferta: /jobs/{id}/fit (¿encajo?) y /jobs/{id}/cover (carta) → cv.py → llm.py → AJAX",
     "/cv/improve → mejora del CV (Harvard/ATS) → profile.feedback + profile.rewrite",
     "/cv/build → cv.build_cv → llm.py → CV nuevo (JSON) en profile.generated_cv; /cv/download → cvpdf.py → PDF ≤2 págs descargable",
-    "Empleos: botón «CV a medida» → POST /jobs/{id}/tailor → cv.tailor_cv(CV generado + vacante + descripción pegada) → _enforce_facts → tabla tailored_cvs → PDF en /jobs/{id}/cv.pdf"
+    "Empleos: botón «CV a medida» → POST /jobs/{id}/tailor → cv.tailor_cv(CV generado + vacante + descripción pegada) → _enforce_facts → tabla tailored_cvs → PDF en /jobs/{id}/cv.pdf",
+    "Todos los procesos → applog (logs/jobhunter.log) → /api/logs → consola en vivo en /logs"
   ],
   "db_schema": {
     "searches": [
@@ -917,6 +929,11 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
       "path": "/jobs/<id>/cv.pdf",
       "method": "GET",
       "purpose": "Descarga el CV a medida de esa vacante en PDF"
+    },
+    {
+      "path": "/logs · /api/logs",
+      "method": "GET",
+      "purpose": "Consola de logs en la UI (App, Búsquedas, journald) con filtros de nivel/texto y modo en vivo"
     }
   ],
   "deployment": {
@@ -986,6 +1003,10 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
     {
       "file": "deploy/",
       "role": "Unidades systemd (referencia)"
+    },
+    {
+      "file": "applog.py",
+      "role": "Log central rotativo compartido entre procesos + helpers de lectura/parseo para la página de Logs"
     }
   ],
   "security": [

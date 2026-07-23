@@ -18,8 +18,11 @@ from xml.etree import ElementTree as ET
 
 import requests
 
+import applog
 from db import get_db, get_setting
 from skills import extract_skills_str
+
+log = applog.get("search")
 
 UA = "Mozilla/5.0 (JobHunter/1.0; +personal-job-search)"
 HEADERS = {"User-Agent": UA, "Accept": "application/json"}
@@ -230,7 +233,7 @@ def fetch_remotive(query):
                 "_text": j.get("title", "") + " " + j.get("description", ""),
             })
     except Exception as e:
-        print("  [Remotive] error:", e)
+        log.warning("[Remotive] error: %s", e)
     return out
 
 
@@ -259,7 +262,7 @@ def fetch_remoteok(query):
                 "_text": f"{j.get('position','')} {j.get('description','')} {tags}",
             })
     except Exception as e:
-        print("  [RemoteOK] error:", e)
+        log.warning("[RemoteOK] error: %s", e)
     return out
 
 
@@ -289,7 +292,7 @@ def fetch_jobicy(query):
                          f"{' '.join(j.get('jobIndustry', []) or [])}",
             })
     except Exception as e:
-        print("  [Jobicy] error:", e)
+        log.warning("[Jobicy] error: %s", e)
     return out
 
 
@@ -319,7 +322,7 @@ def fetch_himalayas(query):
                          f"{' '.join(j.get('categories', []) or [])}",
             })
     except Exception as e:
-        print("  [Himalayas] error:", e)
+        log.warning("[Himalayas] error: %s", e)
     return out
 
 
@@ -354,7 +357,7 @@ def fetch_wwr(query):
                     "_text": f"{title} {item.findtext('description','')}",
                 })
         except Exception as e:
-            print("  [WeWorkRemotely] error:", e)
+            log.warning("[WeWorkRemotely] error: %s", e)
     return out
 
 
@@ -380,7 +383,7 @@ def fetch_arbeitnow(query):
                 "_text": f"{j.get('title','')} {j.get('description','')}",
             })
     except Exception as e:
-        print("  [Arbeitnow] error:", e)
+        log.warning("[Arbeitnow] error: %s", e)
     return out
 
 
@@ -410,7 +413,7 @@ def fetch_themuse(query):
                     "_text": f"{j.get('name','')} {cats}",
                 })
         except Exception as e:
-            print("  [The Muse] error:", e)
+            log.warning("[The Muse] error: %s", e)
             break
     return out
 
@@ -434,7 +437,7 @@ def fetch_workingnomads(query):
                 "_text": f"{j.get('title','')} {j.get('tags','')} {j.get('category_name','')}",
             })
     except Exception as e:
-        print("  [Working Nomads] error:", e)
+        log.warning("[Working Nomads] error: %s", e)
     return out
 
 
@@ -499,7 +502,7 @@ def fetch_landingjobs(query):
                 "_text": f"{j.get('title','')} {tags or ''}",
             })
     except Exception as e:
-        print("  [Landing.jobs] error:", e)
+        log.warning("[Landing.jobs] error: %s", e)
     return out
 
 
@@ -564,7 +567,7 @@ def fetch_getonbrd(query):
                 "_text": f"{title} {a.get('category_name','')}",
             })
     except Exception as e:
-        print("  [Get on Board] error:", e)
+        log.warning("[Get on Board] error: %s", e)
     return out
 
 
@@ -593,7 +596,7 @@ def _rapidapi_get(host, path, params):
         r.raise_for_status()
         return r.json()
     except Exception as e:
-        print(f"  [RapidAPI {host}] error:", e)
+        log.warning("[RapidAPI %s] error: %s", host, e)
         return None
 
 
@@ -824,7 +827,7 @@ def run_all(query_override=None):
         q, kws = r["query"], r["title_keywords"]
         age = r["max_age_days"] or max_age  # ventana propia o global por defecto
         new, seen, new_jobs = run_search(con, q, age, kws, location_mode, use_rapidapi)
-        print(f"  «{q}» (≤{age}d): {seen} coinciden, {new} nuevos")
+        log.info("«%s» (≤%sd): %s coinciden, %s nuevos", q, age, seen, new)
         total_new += new
         all_new_jobs.extend(new_jobs)
 
@@ -841,11 +844,11 @@ def run_all(query_override=None):
         try:
             import notifier
             ok, msg = notifier.send_new_jobs(all_new_jobs)
-            print(f"  Notificación: {'enviada' if ok else 'omitida'} — {msg}")
+            log.info("Notificación %s — %s", "enviada" if ok else "omitida", msg)
         except Exception as e:
-            print(f"  Notificación: error — {e}")
+            log.error("Notificación: error — %s", e)
 
-    print(f"[{stamp}] Total nuevos: {total_new}")
+    log.info("Corrida terminada (%s): %s empleo(s) nuevo(s) en total", stamp, total_new)
     return total_new
 
 

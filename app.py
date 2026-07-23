@@ -6,6 +6,7 @@ from flask import (Flask, render_template, request, redirect, url_for,
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
+import applog
 from db import get_db, init_db, get_setting, set_setting
 import keystore
 from fetcher import run_all
@@ -16,6 +17,9 @@ import notifier
 
 app = Flask(__name__)
 app.secret_key = "job-hunter-local-secret"
+
+log = applog.get("web")
+slog = applog.get("sched")
 
 
 @app.context_processor
@@ -304,6 +308,7 @@ def settings_page():
         con.close()
         if action == "test_notify":
             ok, msg = notifier.send_test()
+            (log.info if ok else log.warning)("Notificación de prueba: %s", msg)
             flash(("✅ " if ok else "⚠️ ") + msg, "ok")
             return redirect(url_for("settings_page") + "#notificaciones")
         return redirect(url_for("settings_page"))
@@ -343,7 +348,9 @@ def settings_page():
 @app.route("/run", methods=["POST"])
 def run_now():
     q = request.form.get("query", "").strip() or None
+    log.info("Búsqueda manual lanzada desde la UI%s", f" para «{q}»" if q else " (todas las activas)")
     total = run_all(q)
+    log.info("Búsqueda manual terminada: %s empleo(s) nuevo(s)", total)
     flash(f"Búsqueda ejecutada: {total} empleo(s) nuevo(s).", "ok")
     return redirect(request.referrer or url_for("index"))
 
@@ -404,6 +411,7 @@ def company_summary():
         # Un nombre de Glassdoor ya fijado (manual o previo) manda la búsqueda.
         pinned = existing["resolved_name"] if existing and existing["resolved_name"] else None
         old_url = existing["glassdoor_url"] if existing else None
+        log.info("Resumen de reputación solicitado para «%s»", company)
         result = generate_company_summary(pinned or company)
         keep_resolved = pinned or result.get("resolved")
         # Preferimos la URL directa nueva; si esta vez no la halló, conservamos la previa.
@@ -552,6 +560,7 @@ def cv_analyze():
         flash("Pega el texto de tu CV o sube un PDF.", "ok")
         return redirect(url_for("cv_page"))
 
+    log.info("Analizando CV (%s)", "PDF" if pdf_b64 else "texto")
     res = cvai.analyze_cv(text=text or None, pdf_b64=pdf_b64)
     con = get_db()
     if res.get("ok"):
@@ -618,6 +627,7 @@ def cv_match():
             total += 1
     con.commit()
     con.close()
+    log.info("Afinidad recalculada para %s empleo(s)", total)
     flash(f"Afinidad calculada para {total} empleo(s).", "ok")
     return redirect(url_for("index", sort="match"))
 
@@ -677,6 +687,7 @@ def cv_build():
         else:
             errors.append(f"{names[lg]}: {res.get('error', '')}")
     if built:
+        log.info("CV nuevo generado (%s)", ", ".join(built))
         import json
         con.execute("UPDATE profile SET generated_cv=? WHERE id=1",
                     (json.dumps(built, ensure_ascii=False),))
@@ -765,9 +776,12 @@ def job_tailor(job_id):
     if lang not in langs:
         lang = "es" if "es" in langs else next(iter(langs))
     jd = request.form.get("jd", "").strip()[:12000]
+    log.info("Generando CV a medida para «%s» (%s, %s, descripción: %s)",
+             job["title"], job["company"] or "?", lang, "sí" if jd else "no")
     res = cvai.tailor_cv(langs[lang], dict(job), lang=lang, job_desc=jd or None, profile=p)
     if not res.get("ok"):
         con.close()
+        log.error("CV a medida falló para «%s»: %s", job["title"], res.get("error", ""))
         return jsonify(ok=False, error=res.get("error", "")), 500
     con.execute(
         """INSERT INTO tailored_cvs(job_id,lang,cv,notes,ats_score,job_desc,updated_at)
@@ -779,6 +793,7 @@ def job_tailor(job_id):
          res["ats_score"], jd or None))
     con.commit()
     con.close()
+    log.info("CV a medida listo para «%s»: encaje ATS %s%%", job["title"], res["ats_score"])
     html = render_template("_tailorblock.html", notes=res["notes"], job_id=job_id,
                            lang=lang, expanded=True)
     return jsonify(ok=True, html=html)
@@ -849,6 +864,114 @@ def api_unread():
     return jsonify(unread=c)
 
 
+# Fuentes de log que la UI puede leer. Lista blanca cerrada: el parámetro `source`
+# nunca se interpola en un comando; solo indexa este diccionario.
+LOG_SOURCES = {
+    "app":    {"label": "App", "kind": "file"},
+    "search": {"label": "Búsquedas", "kind": "file",
+               "path": os.path.join(BASE_DIR, "search.log")},
+    "web":    {"label": "Sistema · web", "kind": "unit",
+               "unit": "jobhunter-web.service"},
+    "svc":    {"label": "Sistema · búsqueda", "kind": "unit",
+               "unit": "jobhunter-search.service"},
+}
+
+
+def _journal_lines(unit, n):
+    """Últimas n líneas del journal de una unidad (pi está en el grupo `adm`)."""
+    import subprocess
+    try:
+        out = subprocess.run(
+            ["journalctl", "-u", unit, "-n", str(n), "--no-pager", "-o", "short-iso"],
+            capture_output=True, text=True, timeout=12)
+        if out.returncode != 0:
+            return [f"(no se pudo leer el journal de {unit}: {out.stderr.strip()})"]
+        return [l for l in out.stdout.splitlines() if l.strip()]
+    except Exception as e:
+        return [f"(error al leer el journal: {e})"]
+
+
+_JOURNAL_RE = None
+
+
+def _parse_journal(line):
+    """'2026-07-23T18:03:22-05:00 host proceso[pid]: mensaje' → columnas limpias."""
+    import re
+    global _JOURNAL_RE
+    if _JOURNAL_RE is None:
+        _JOURNAL_RE = re.compile(
+            r"^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})[^ ]*\s+\S+\s+([^\[:]+)(?:\[\d+\])?:\s?(.*)$")
+    m = _JOURNAL_RE.match(line)
+    if not m:
+        import applog as al
+        return al.parse(line)
+    date, hhmmss, proc, msg = m.groups()
+    low = msg.lower()
+    level = ("ERROR" if ("error" in low or "traceback" in low or "failed" in low
+                         or "exception" in low)
+             else ("WARNING" if ("warn" in low or "deprecat" in low) else "INFO"))
+    return {"ts": f"{date} {hhmmss}", "level": level, "src": proc.strip()[:9],
+            "msg": msg, "raw": line}
+
+
+@app.route("/logs")
+def logs_page():
+    return render_template("logs.html", sources=LOG_SOURCES)
+
+
+@app.route("/api/logs")
+def api_logs():
+    """Líneas de log ya parseadas para la consola de la UI."""
+    import applog as al
+    src = request.args.get("source", "app")
+    if src not in LOG_SOURCES:
+        src = "app"
+    try:
+        n = max(20, min(2000, int(request.args.get("n", 300))))
+    except (TypeError, ValueError):
+        n = 300
+    spec = LOG_SOURCES[src]
+    if spec["kind"] == "unit":
+        raw = _journal_lines(spec["unit"], n)
+        lines = [_parse_journal(l) for l in raw]
+    elif src == "app":
+        lines = [al.parse(l) for l in al.read_app_log(n)]
+    else:
+        lines = [al.parse(l) for l in al._tail_file(spec["path"], n)]
+    level = request.args.get("level", "").upper()
+    if level in ("INFO", "WARNING", "ERROR"):
+        order = {"DEBUG": 0, "INFO": 1, "WARNING": 2, "ERROR": 3, "CRITICAL": 4}
+        floor = order[level]
+        lines = [l for l in lines if order.get(l["level"], 1) >= floor]
+    q = request.args.get("q", "").strip().lower()
+    if q:
+        lines = [l for l in lines if q in l["raw"].lower()]
+    return jsonify(source=src, label=spec["label"], count=len(lines), lines=lines)
+
+
+@app.route("/logs/clear", methods=["POST"])
+def logs_clear():
+    """Vacía el log de la app (los del sistema los gestiona journald)."""
+    import applog as al
+    try:
+        open(al.LOG_FILE, "w").close()
+        log.info("Log de la app vaciado desde la UI")
+        flash("Log de la app vaciado.", "ok")
+    except OSError as e:
+        flash(f"No se pudo vaciar el log: {e}", "ok")
+    return redirect(url_for("logs_page"))
+
+
+@app.route("/logs/download")
+def logs_download():
+    import applog as al
+    if not os.path.exists(al.LOG_FILE):
+        flash("Todavía no hay log de la app.", "ok")
+        return redirect(url_for("logs_page"))
+    return send_file(al.LOG_FILE, mimetype="text/plain", as_attachment=True,
+                     download_name="jobhunter.log")
+
+
 @app.route("/architecture")
 def architecture_page():
     path = os.path.join(BASE_DIR, "architecture.html")
@@ -906,13 +1029,13 @@ def parse_times(raw):
 def _run_search_scheduled(cur):
     """Ejecuta run_all() en segundo plano, sin solaparse con otra corrida."""
     if not _search_lock.acquire(blocking=False):
-        print(f"[scheduler] búsqueda ya en curso a las {cur}; se omite", flush=True)
+        slog.warning("Búsqueda ya en curso a las %s; se omite este disparo", cur)
         return
     try:
         total = run_all()
-        print(f"[scheduler] búsqueda programada ({cur}): {total} nuevo(s)", flush=True)
+        slog.info("Búsqueda programada (%s) completada: %s empleo(s) nuevo(s)", cur, total)
     except Exception as e:
-        print(f"[scheduler] error en búsqueda programada: {e}", flush=True)
+        slog.error("Error en la búsqueda programada: %s", e)
     finally:
         _search_lock.release()
 
@@ -938,6 +1061,7 @@ def _scheduler():
                 if cur in times and not already:
                     set_setting(con, "last_scheduled_run", stamp)
                     con.close()
+                    slog.info("Disparando búsqueda programada de las %s", cur)
                     threading.Thread(target=_run_search_scheduled, args=(cur,),
                                      daemon=True).start()
                 else:
@@ -945,15 +1069,16 @@ def _scheduler():
                 try:
                     sent, msg = notifier.maybe_send_digest(now)
                     if sent:
-                        print(f"[digest] enviado — {msg}", flush=True)
+                        slog.info("Resumen diario enviado — %s", msg)
                 except Exception as e:
-                    print(f"[digest] error — {e}", flush=True)
+                    slog.error("Error al enviar el resumen diario: %s", e)
         except Exception as e:
-            print(f"[scheduler] error — {e}", flush=True)
+            slog.error("Error en el planificador: %s", e)
         time.sleep(20)
 
 
 if __name__ == "__main__":
     init_db()
+    log.info("JobHunter arrancado — servidor en :8080 y planificador activo")
     threading.Thread(target=_scheduler, daemon=True).start()
     app.run(host="0.0.0.0", port=8080, debug=False)

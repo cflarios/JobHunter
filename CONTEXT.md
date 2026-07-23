@@ -47,13 +47,14 @@ job-hunter/
 ├── fetcher.py          # 11 fuentes, filtros (título/ubicación/fecha), orquestación
 ├── skills.py           # Extracción de skills técnicas del texto (diccionario curado)
 ├── llm.py              # Capa de proveedor de IA: enruta a Claude o Gemini (ai_provider)
+├── applog.py           # Log central rotativo (logs/jobhunter.log) + lectura para la UI
 ├── notifier.py         # Notificaciones de empleos nuevos (email SMTP + HTML estético)
 ├── reviews.py          # Resumen de reputación de empresas (IA + búsqueda web/grounding)
 ├── cv.py               # CV + IA: analizar, match, ¿encajo?, carta, mejorar, generar CV,
 │                       #   CV a medida por vacante (ATS) + blindaje anti-alucinación
 ├── cvpdf.py            # Renderiza el CV nuevo a PDF (fpdf2 + DejaVu, ≤2 págs)
 ├── run_search.sh       # Wrapper del cron (→ fetcher.py, log en search.log)
-├── templates/          # 11 vistas Jinja2 (base, index, searches, settings, blacklist,
+├── templates/          # 12 vistas Jinja2 (base, index, searches, settings, blacklist, logs,
 │                       #   notifications, companies, cv, _review, _fitblock, _tailorblock)
 ├── deploy/             # Copia de referencia de las unidades systemd (sin secretos)
 ├── architecture.json   # Modelo estructurado del sistema (fuente de verdad)
@@ -332,6 +333,7 @@ Empleos `/` · Buscar ahora `/run` · Búsquedas `/searches` · **Configuración
 `/settings` (proveedor de IA + claves + notificaciones/SMTP; POST: `set_provider`,
 `set_apikey`/`clear_apikey`, `set_notify`, `clear_smtp_pass`, `clear_telegram_token`,
 `test_notify`, `set_schedule` [horarios del planificador]) ·
+**Logs** `/logs` (consola en vivo; + `/api/logs`, `/logs/clear`, `/logs/download`) ·
 Notificaciones `/notifications` · Compañías `/companies` (+ `/companies/summary`,
 `/companies/glassdoor-name`, `/companies/block`, `/companies/unblock`) ·
 **Bloqueos** `/blacklist` (blacklist de compañías, alta manual) ·
@@ -340,6 +342,32 @@ Notificaciones `/notifications` · Compañías `/companies` (+ `/companies/summa
 **`/tailor`** (CV a medida ATS, AJAX) y **`/cv.pdf`** (descarga ese CV) ·
 mapas `/architecture` `/architecture.json` `/workflow` · polling `/api/unread`
 `/api/jobs-status`.
+
+---
+
+## 9b. Logging y página de Logs (`applog.py`)
+
+**Un único log central** en `logs/jobhunter.log` (rotativo: 512 KB × 3 backups) al que
+escriben **los dos procesos** (web y las corridas de búsqueda), más un `StreamHandler`
+para que la salida siga llegando al journal y a `search.log` como antes.
+
+Formato pensado para parsearse en la UI:
+`2026-07-23 18:04:11 | INFO | search | «DevOps Engineer» (≤3d): 20 vistos, 1 nuevos`
+
+- `applog.get(name)` → logger hijo de `jh` (`web`, `search`, `sched`, `notify`).
+  Los `print()` dispersos de `fetcher.py` y del planificador se migraron a este log.
+- **Página `/logs`** — **vista de consola** (terminal oscura, monoespaciada, coloreada
+  por nivel) con **4 fuentes** en pestañas: **App** (`jobhunter.log`, incluye rotados),
+  **Búsquedas** (`search.log`), **Sistema · web** y **Sistema · búsqueda** (journald).
+  Filtros de **nivel** y **texto**, selector de líneas (200/500/1000), **modo en vivo**
+  (sondeo 5 s) con auto-scroll que **respeta el scroll manual**, descargar y vaciar.
+- `/api/logs?source=&n=&level=&q=` devuelve las líneas ya parseadas
+  (`ts/level/src/msg`). Las del journal se parsean aparte (`_parse_journal`).
+- **Seguridad:** `source` es una **lista blanca cerrada** (`LOG_SOURCES`); nunca se
+  interpola en el comando de `journalctl`, solo indexa el diccionario. `pi` puede leer
+  el journal por pertenecer al grupo `adm`.
+- **Gotcha:** los ficheros rotados se llaman `jobhunter.log.1`, `.2`… y **no** casan
+  con el patrón `*.log` del `.gitignore`; por eso se ignora el directorio `logs/`.
 
 ---
 

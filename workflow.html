@@ -155,6 +155,8 @@
     {id:'cvpdf',   c:6, k:'amber', t:'cvpdf.py',      s:'CV nuevo → PDF', tag:'pdf'},
     {id:'r_cv',    c:5, k:'violet',t:'Mi CV',         s:'/cv'},
     {id:'r_set',   c:5, k:'violet',t:'Configuración', s:'/settings', tag:'config'},
+    {id:'r_logs',  c:5, k:'violet',t:'Logs',          s:'/logs · consola', tag:'obs'},
+    {id:'applog',  c:4, k:'green', t:'applog',        s:'jobhunter.log', tag:'log'},
     {id:'notifier',c:6, k:'violet',t:'notifier.py',   s:'avisos · inmediato/diario', tag:'notif'},
     {id:'tailor',  c:6, k:'amber', t:'tailor_cv()',    s:'CV a medida ATS', tag:'ats'},
     {id:'t_tcv',   c:4, k:'green', t:'tailored_cvs',   s:'CV por vacante'},
@@ -196,6 +198,9 @@
     // --- Notificaciones (inmediato tras run_all + resumen diario del planificador) ---
     ['run_all','notifier'],['sched','notifier','config'],['t_set','notifier','config'],
     ['notifier','email','ext'],['notifier','telegram','ext'],
+    // --- Observabilidad: todo escribe al log central, la UI lo lee ---
+    ['run_all','applog','config'],['notifier','applog','config'],['flask','applog','config'],
+    ['applog','r_logs'],['flask','r_logs'],['r_logs','browser','poll'],
     // --- CV a medida por vacante (ATS) ---
     ['r_index','tailor','ext'],['browser','tailor','ext'],
     ['t_prof','tailor','config'],['t_jobs','tailor','config'],

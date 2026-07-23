@@ -17,3 +17,6 @@ jobs.db-shm
 .env
 *.key
 apikey.conf
+
+# Logs de la app (rotados: jobhunter.log.1, .2…)
+logs/

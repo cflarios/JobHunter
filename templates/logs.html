@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block title %}Logs · JobHunter{% endblock %}
+{% block body %}
+
+<style>
+.console{background:#0a0e17;border:1px solid var(--line);border-radius:12px;overflow:hidden;
+  display:flex;flex-direction:column;min-height:0}
+.console-bar{display:flex;align-items:center;gap:10px;padding:9px 12px;background:#111826;
+  border-bottom:1px solid var(--line);flex-wrap:wrap}
+.dots{display:flex;gap:6px;margin-right:4px}
+.dots i{width:11px;height:11px;border-radius:50%;display:block}
+.console-title{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:var(--mut)}
+.console-body{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-size:12.5px;
+  line-height:1.55;padding:12px 14px;overflow:auto;height:60vh;min-height:320px;
+  scrollbar-width:thin}
+.ln{display:flex;gap:10px;white-space:pre-wrap;word-break:break-word;padding:1px 0;
+  border-left:2px solid transparent;padding-left:8px;margin-left:-8px}
+.ln:hover{background:rgba(255,255,255,.035)}
+.ln .t{color:#5d6b8f;flex:0 0 auto}
+.ln .lv{flex:0 0 auto;font-weight:700;min-width:58px}
+.ln .sc{flex:0 0 auto;color:#7c8bb3;min-width:64px}
+.ln .m{flex:1;color:#c9d6ee;min-width:0}
+.ln.ERROR{border-left-color:#ef4444;background:rgba(239,68,68,.07)}
+.ln.ERROR .lv{color:#ff8b8b} .ln.ERROR .m{color:#ffc9c9}
+.ln.WARNING{border-left-color:var(--warn);background:rgba(245,158,11,.06)}
+.ln.WARNING .lv{color:#f5c877} .ln.WARNING .m{color:#f0dcb4}
+.ln.INFO .lv{color:#5f9bff}
+.ln.DEBUG .lv{color:#6b7794} .ln.DEBUG .m{color:#93a1bf}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tab{background:transparent;border:1px solid var(--line);color:var(--mut);border-radius:8px;
+  padding:5px 11px;font-size:12.5px;cursor:pointer;font-family:inherit}
+.tab:hover{color:var(--txt);border-color:var(--accent)}
+.tab.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.live-dot{width:8px;height:8px;border-radius:50%;background:var(--accent2);display:inline-block;
+  margin-right:6px;vertical-align:1px}
+@media (prefers-reduced-motion:no-preference){
+  .live-dot.on{animation:pulse 1.6s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+}
+.live-dot.off{background:var(--mut)}
+.empty{color:#5d6b8f;font-style:italic}
+</style>
+
+<div class="row" style="justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+  <h2 style="margin:0">Logs</h2>
+  <div class="row" style="gap:8px">
+    <a class="btn sm ghost" href="{{ url_for('logs_download') }}">⬇ Descargar</a>
+    <form method="post" action="{{ url_for('logs_clear') }}"
+          data-confirm="Se vaciará el log de la app. Los logs del sistema (journald) no se tocan."
+          data-confirm-title="Vaciar log" data-confirm-label="Vaciar" data-confirm-danger>
+      <button class="btn sm danger" type="submit">🗑 Vaciar</button>
+    </form>
+  </div>
+</div>
+<p class="muted" style="margin-top:0">Comportamiento de la app en vivo: búsquedas, planificador, notificaciones, IA y errores.</p>
+
+<div class="card" style="padding:14px">
+  <div class="row" style="gap:10px;align-items:center">
+    <div class="tabs" id="tabs">
+      {% for key, s in sources.items() %}
+      <button class="tab {{ 'active' if key=='app' }}" data-src="{{ key }}">{{ s.label }}</button>
+      {% endfor %}
+    </div>
+    <div class="row" style="gap:8px;margin-left:auto;align-items:center">
+      <input type="search" id="q" placeholder="Filtrar texto…" style="width:170px;padding:6px 10px;font-size:13px">
+      <select id="level" style="padding:6px 10px;font-size:13px" title="Nivel mínimo">
+        <option value="">Todos</option>
+        <option value="INFO">Info+</option>
+        <option value="WARNING">Avisos+</option>
+        <option value="ERROR">Solo errores</option>
+      </select>
+      <select id="n" style="padding:6px 10px;font-size:13px" title="Líneas a mostrar">
+        <option value="200">200</option>
+        <option value="500" selected>500</option>
+        <option value="1000">1000</option>
+      </select>
+      <label class="switch" style="font-size:13px" title="Refresco automático cada 5 s">
+        <input type="checkbox" id="live" checked>
+        <span class="track"><span class="knob"></span></span>
+        <span>En vivo</span>
+      </label>
+    </div>
+  </div>
+</div>
+
+<div class="console">
+  <div class="console-bar">
+    <span class="dots"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i></span>
+    <span class="console-title" id="ctitle">jobhunter · app</span>
+    <span class="console-title" style="margin-left:auto">
+      <span class="live-dot on" id="dot"></span><span id="meta">cargando…</span>
+    </span>
+  </div>
+  <div class="console-body" id="out"><div class="empty">Cargando…</div></div>
+</div>
+
+<script>
+(function(){
+  var out=document.getElementById('out'), meta=document.getElementById('meta'),
+      dot=document.getElementById('dot'), ctitle=document.getElementById('ctitle'),
+      qEl=document.getElementById('q'), lvEl=document.getElementById('level'),
+      nEl=document.getElementById('n'), liveEl=document.getElementById('live');
+  var src='app', timer=null, lastKey='';
+
+  function esc(s){ var d=document.createElement('div'); d.textContent=s==null?'':s; return d.innerHTML; }
+
+  function atBottom(){ return out.scrollHeight - out.scrollTop - out.clientHeight < 40; }
+
+  function render(d){
+    var key=d.count+'|'+(d.lines.length?d.lines[d.lines.length-1].raw:'');
+    if(key===lastKey) return;          // sin cambios: no repintamos ni saltamos el scroll
+    lastKey=key;
+    var stick=atBottom();
+    if(!d.lines.length){
+      out.innerHTML='<div class="empty">Sin líneas para este filtro.</div>';
+    } else {
+      out.innerHTML=d.lines.map(function(l){
+        var lv=(l.level||'INFO').toUpperCase();
+        return '<div class="ln '+esc(lv)+'">'+
+          (l.ts?'<span class="t">'+esc(l.ts)+'</span>':'')+
+          '<span class="lv">'+esc(lv)+'</span>'+
+          (l.src?'<span class="sc">'+esc(l.src)+'</span>':'')+
+          '<span class="m">'+esc(l.msg)+'</span></div>';
+      }).join('');
+    }
+    if(stick) out.scrollTop=out.scrollHeight;
+    var now=new Date().toLocaleTimeString();
+    meta.textContent=d.count+' líneas · '+now;
+    ctitle.textContent='jobhunter · '+d.label.toLowerCase();
+  }
+
+  function load(){
+    var u='{{ url_for("api_logs") }}?source='+encodeURIComponent(src)
+        +'&n='+nEl.value+'&level='+lvEl.value+'&q='+encodeURIComponent(qEl.value);
+    fetch(u).then(function(r){return r.json();}).then(render)
+      .catch(function(){ meta.textContent='error al cargar'; });
+  }
+  function schedule(){
+    if(timer) clearInterval(timer);
+    dot.className='live-dot '+(liveEl.checked?'on':'off');
+    if(liveEl.checked){ timer=setInterval(load,5000); }
+  }
+
+  document.getElementById('tabs').addEventListener('click',function(e){
+    var b=e.target.closest('.tab'); if(!b) return;
+    document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});
+    b.classList.add('active'); src=b.dataset.src; lastKey='';
+    out.scrollTop=out.scrollHeight; load();
+  });
+  [qEl,lvEl,nEl].forEach(function(el){
+    el.addEventListener('input',function(){ lastKey=''; load(); });
+    el.addEventListener('change',function(){ lastKey=''; load(); });
+  });
+  liveEl.addEventListener('change',schedule);
+  load(); schedule();
+})();
+</script>
+{% endblock %}

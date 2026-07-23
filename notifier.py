@@ -31,8 +31,11 @@ from email.utils import formataddr, formatdate, make_msgid
 
 import requests
 
+import applog
 from db import get_db, get_setting, set_setting
 import keystore
+
+log = applog.get("notify")
 
 DEFAULT_SMTP_HOST = "smtp.gmail.com"
 DEFAULT_SMTP_PORT = 587
@@ -374,10 +377,12 @@ def _dispatch(cfg, jobs, subject, digest=False):
     if "email" in chans:
         ok, m = _send_email(cfg, subject, render_email(jobs, cfg["app_url"], digest))
         any_ok = any_ok or ok
+        (log.info if ok else log.error)("%s (%s empleos)", m, len(jobs))
         results.append(("✓ " if ok else "✗ ") + m)
     if "telegram" in chans:
         ok, m = _send_telegram(cfg, render_telegram(jobs, cfg["app_url"], digest))
         any_ok = any_ok or ok
+        (log.info if ok else log.error)("%s (%s empleos)", m, len(jobs))
         results.append(("✓ " if ok else "✗ ") + m)
     return any_ok, " | ".join(results)
 
