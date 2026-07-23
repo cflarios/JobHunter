@@ -7,6 +7,7 @@ from flask import (Flask, render_template, request, redirect, url_for,
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 from db import get_db, init_db, get_setting, set_setting
+import keystore
 from fetcher import run_all
 from reviews import generate_company_summary
 import cv as cvai
@@ -197,6 +198,22 @@ def searches():
                 prov = "claude"
             set_setting(con, "ai_provider", prov)
             flash("Proveedor de IA actualizado a " + llm.provider_label(prov) + ".", "ok")
+        elif action in ("set_apikey", "clear_apikey"):
+            provider = request.form.get("provider", "")
+            label = "Claude (Anthropic)" if provider == "anthropic" else "Gemini"
+            if provider not in ("anthropic", "gemini"):
+                flash("Proveedor inválido.", "ok")
+            elif action == "clear_apikey":
+                keystore.set_api_key(provider, "")
+                flash(f"Clave de {label} borrada.", "ok")
+            else:
+                # No registrar ni mostrar nunca el valor de la clave.
+                key = request.form.get("api_key", "").strip()
+                if not key or " " in key or len(key) < 10:
+                    flash("Clave no guardada: parece vacía o inválida.", "ok")
+                else:
+                    keystore.set_api_key(provider, key)  # cifrada en la BD
+                    flash(f"Clave de {label} guardada de forma segura.", "ok")
         con.commit()
         con.close()
         return redirect(url_for("searches"))
@@ -209,9 +226,24 @@ def searches():
     use_rapidapi = get_setting(con, "use_rapidapi", "0") == "1"
     ai_provider = get_setting(con, "ai_provider", "claude")
     con.close()
+
+    def _mask(k):
+        k = (k or "").strip()
+        return (k[:6] + "…" + k[-4:]) if len(k) > 12 else ("••••" if k else "")
+
+    ak = keystore.get_api_key("anthropic")
+    gk = keystore.get_api_key("gemini")
+    providers = [
+        {"id": "anthropic", "name": "Claude (Anthropic)", "paid": True,
+         "get_url": "https://console.anthropic.com/settings/keys",
+         "set": bool(ak), "mask": _mask(ak)},
+        {"id": "gemini", "name": "Gemini (Google AI Studio)", "paid": False,
+         "get_url": "https://aistudio.google.com/apikey",
+         "set": bool(gk), "mask": _mask(gk)},
+    ]
     return render_template("searches.html", searches=rows, max_age=max_age,
                            location_mode=location_mode, use_rapidapi=use_rapidapi,
-                           ai_provider=ai_provider)
+                           ai_provider=ai_provider, providers=providers)
 
 
 @app.route("/run", methods=["POST"])

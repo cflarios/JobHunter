@@ -99,6 +99,14 @@ details.ai-box .ai-body>*:first-child{margin-top:0}
 .switch>input:checked+.track{background:var(--sw-on,var(--accent2))}
 .switch>input:checked+.track .knob{transform:translateX(20px)}
 .switch>input:focus-visible+.track{outline:2px solid var(--accent);outline-offset:2px}
+/* Sección colapsable dentro de una tarjeta (p. ej. Claves de API) */
+details.section{border-top:1px solid var(--line);margin-top:14px;padding-top:2px}
+details.section>summary{list-style:none;cursor:pointer;padding:10px 0;font-weight:600;
+  font-size:14px;display:flex;align-items:center;gap:8px;user-select:none}
+details.section>summary::-webkit-details-marker{display:none}
+details.section>summary .chev{margin-left:auto;color:var(--mut);font-size:11px;
+  transition:transform .18s}
+details.section[open]>summary .chev{transform:rotate(180deg)}
 </style>
 <script>
 // Spinner al enviar formularios lentos (marcados con class="busy")

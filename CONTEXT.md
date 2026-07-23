@@ -269,6 +269,22 @@ sudo systemctl restart jobhunter-web.service       # tras cambios en app/templat
   activo, la IA degrada con un mensaje que sugiere cambiar de proveedor.
 - Carga: systemd con `EnvironmentFile` **y** `db.py` como fallback (`setdefault`,
   no pisa variables ya definidas) para ejecuciones manuales.
+- **Claves de IA configurables desde la UI** (página Búsquedas → Proveedor de IA →
+  sección **colapsable** "Claves de API"). El `.env` es **solo para desarrollo**
+  (fallback); las claves que el usuario registra desde la web se guardan **cifradas
+  en la BD** vía **`keystore.py`**:
+  - `keystore.set_api_key(provider, value)` cifra con **Fernet** y guarda en
+    `settings` (`apikey_anthropic`/`apikey_gemini`); value vacío → borra.
+  - `keystore.get_api_key(provider)` = **BD (descifrada) → fallback `.env`**.
+    `llm.py` (`_anthropic_key`/`_gemini_key`) lo usa; efecto inmediato sin reiniciar.
+  - **Clave maestra Fernet en `secret.key`** (fichero aparte, permisos 600,
+    gitignored por `*.key`), no en el `.env` ni en la BD → un volcado de la BD por
+    sí solo **no revela** ninguna clave (solo ciphertext `gAAAA…`).
+  - Seguridad UI: input `type=password` + `autocomplete=new-password`; la clave
+    **nunca** se muestra completa (solo máscara `prefijo…4últimos`), no se registra
+    ni se "flashea". Botones **con iconos** (💾 guardar / 🗑 borrar, borrar usa el
+    modal in-page). Enlaces para obtener la clave (Anthropic Console / Google AI
+    Studio). Dep nueva: `cryptography` (requirements.txt).
 - **Si se mueve el proyecto de carpeta**, actualizar la ruta absoluta del
   `EnvironmentFile` en los dos drop-ins de systemd
   (`/etc/systemd/system/jobhunter-{web,search}.service.d/apikey.conf`).

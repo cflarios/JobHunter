@@ -13,7 +13,7 @@ jobs.db-shm
 # Logs
 *.log
 
-# Secretos / entorno (la API key va en el override de systemd, no en el repo)
+# Secretos / entorno (claves y clave maestra de cifrado, nunca en el repo)
 .env
 *.key
 apikey.conf

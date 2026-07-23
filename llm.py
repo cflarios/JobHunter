@@ -75,7 +75,8 @@ def _parse_json(txt):
 
 # --- Gemini ---------------------------------------------------------------- #
 def _gemini_key():
-    return os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+    import keystore
+    return keystore.get_api_key("gemini")
 
 
 def _gemini_complete(parts, json_out, max_tokens, web_search):
@@ -120,7 +121,8 @@ def _gemini_complete(parts, json_out, max_tokens, web_search):
 
 # --- Claude (Anthropic) ---------------------------------------------------- #
 def _anthropic_key():
-    return os.environ.get("ANTHROPIC_API_KEY")
+    import keystore
+    return keystore.get_api_key("anthropic")
 
 
 def _to_claude_content(parts):
