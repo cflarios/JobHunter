@@ -73,8 +73,8 @@ También hay **memoria de Claude** en
 ## 4. Flujo de datos (resumen)
 
 ```
-Timer 12:00 (o Usuario "Buscar ahora")
-   → run_search.sh → fetcher.run_all()
+Planificador in-app a las horas configuradas (o Usuario "Buscar ahora")
+   → fetcher.run_all()   (run_search.sh sigue disponible para corridas manuales)
       → run_search(): consulta las 11 fuentes (HTTP)
          → filtros uniformes: title_ok → location_ok → ventana de días → dedup(URL)
             → INSERT OR IGNORE en `jobs` + notificación si hay nuevos
@@ -292,7 +292,7 @@ usuario activa. `notifier` despacha a **todos los canales activos y bien configu
 | `blocked_companies` | Blacklist: empresas que no deben aparecer (name PRIMARY KEY COLLATE NOCASE) |
 | `jobs` | Empleos: title, company, url (unique), source, salary, location, posted_ts, skills, is_new |
 | `notifications` | Avisos de hallazgos (read) |
-| `settings` | Config global (location_mode, max_age_days, last_run, ai_provider, use_rapidapi, notify_* [enabled/immediate/digest/digest_time/email_on/telegram_on/email], smtp_*, telegram_chat_id, last_digest_date, app_base_url; `apikey_*`/`secret_smtp_password`/`secret_telegram_token` cifrados) |
+| `settings` | Config global (location_mode, max_age_days, last_run, ai_provider, use_rapidapi, **search_times** [horas del planificador], last_scheduled_run, notify_* [enabled/immediate/digest/digest_time/email_on/telegram_on/email], smtp_*, telegram_chat_id, last_digest_date, app_base_url; `apikey_*`/`secret_smtp_password`/`secret_telegram_token` cifrados) |
 | `company_reviews` | Caché de resúmenes de empresa + resolved_name + glassdoor_url (página directa) |
 | `profile` | Perfil del CV (1 fila): cv_text, role, skills, summary, suggested_keywords, feedback, rewrite, generated_cv (JSON del CV nuevo) |
 | `job_matches` | Afinidad por empleo: score, reason, fit_detail |
@@ -304,7 +304,7 @@ usuario activa. `notifier` despacha a **todos los canales activos y bien configu
 Empleos `/` · Buscar ahora `/run` · Búsquedas `/searches` · **Configuración**
 `/settings` (proveedor de IA + claves + notificaciones/SMTP; POST: `set_provider`,
 `set_apikey`/`clear_apikey`, `set_notify`, `clear_smtp_pass`, `clear_telegram_token`,
-`test_notify`) ·
+`test_notify`, `set_schedule` [horarios del planificador]) ·
 Notificaciones `/notifications` · Compañías `/companies` (+ `/companies/summary`,
 `/companies/glassdoor-name`, `/companies/block`, `/companies/unblock`) ·
 **Bloqueos** `/blacklist` (blacklist de compañías, alta manual) ·
@@ -315,23 +315,45 @@ mapas `/architecture` `/architecture.json` `/workflow` · polling `/api/unread`
 
 ---
 
-## 10. Despliegue (systemd)
+## 10. Despliegue (systemd) y planificador in-app
 
 - **`jobhunter-web.service`** — servidor Flask, puerto 8080, arranca en boot,
-  `Restart=on-failure`.
-- **`jobhunter-search.service`** — `oneshot`, lanza `run_search.sh`.
-- **`jobhunter-search.timer`** — `OnCalendar=*-*-* 12:00:00` (America/Bogota),
-  `Persistent=true` (recupera la corrida si la Pi estuvo apagada al mediodía).
+  `Restart=on-failure`. **Aloja también el planificador** (hilo demonio
+  `app._scheduler`, ver §10b).
+- **`jobhunter-search.service`** — `oneshot`, lanza `run_search.sh` (queda para
+  **corridas manuales**: `sudo systemctl start jobhunter-search.service`).
+- **`jobhunter-search.timer`** — **DESACTIVADO** (`systemctl disable --now`). Antes
+  disparaba la búsqueda a las 12:00 fijo; ahora la **hora (o varias) la define el
+  usuario** desde Configuración y las ejecuta el planificador in-app. Las unidades
+  siguen en `deploy/` como referencia; para volver al modelo systemd bastaría
+  `systemctl enable --now jobhunter-search.timer` (pero entonces habría que vaciar
+  `search_times` para no duplicar).
+
+### 10b. Planificador in-app (§ nuevo)
+
+El **web service corre 24/7**, así que aloja un **hilo demonio** (`app._scheduler`)
+que cada ~20 s, una vez por minuto (hora local = America/Bogota):
+- **Búsquedas:** si `HH:MM` está en `settings.search_times` (lista "HH:MM" separada por
+  comas, por defecto `12:00`) y no se corrió ya ese minuto (`last_scheduled_run`),
+  lanza `run_all()` en otro hilo (con `_search_lock` para no solaparse).
+- **Resumen diario:** llama `notifier.maybe_send_digest()` (idempotente).
+
+Configurable en **Configuración → ⏰ Programación de búsquedas** (`set_schedule`): UI
+para **añadir/quitar varias horas**. Sin horas = búsqueda automática **off** (queda
+"Buscar ahora"). Ventaja vs. systemd: **multi-hora y editable desde la web sin sudo**;
+contra: no hay catch-up tipo `Persistent=true` (si la Pi está apagada a esa hora, ese
+disparo se pierde — pero el web service está siempre arriba).
 
 **Gotcha:** los **dos** servicios necesitan las API keys (el `search` usa
-`RAPIDAPI_KEY` para LinkedIn; el `web` usa ambas para "Buscar ahora" y la IA).
-Ambos cargan las variables con `EnvironmentFile=…/.env`.
+`RAPIDAPI_KEY` para LinkedIn; el `web` usa ambas para "Buscar ahora", la IA, **el
+planificador y las notificaciones**). Ambos cargan las variables con
+`EnvironmentFile=…/.env`.
 
 Comandos útiles:
 ```bash
-sudo systemctl status jobhunter-web.service        # estado del sitio
-systemctl list-timers jobhunter-search.timer       # próxima corrida
-sudo systemctl start jobhunter-search.service      # forzar búsqueda ahora
+sudo systemctl status jobhunter-web.service        # estado del sitio + planificador
+journalctl -u jobhunter-web.service -f | grep -E "scheduler|digest"  # ver disparos
+sudo systemctl start jobhunter-search.service      # forzar búsqueda ahora (manual)
 tail -f /home/pi/project/job-hunter/search.log     # log de búsquedas
 sudo systemctl restart jobhunter-web.service       # tras cambios en app/templates
 ```

@@ -285,6 +285,15 @@ def settings_page():
         elif action == "clear_telegram_token":
             keystore.set_secret("telegram_token", "")
             flash("Token de Telegram borrado.", "ok")
+        elif action == "set_schedule":
+            times = parse_times(" ".join(request.form.getlist("times")))
+            set_setting(con, "search_times", ",".join(times))
+            if times:
+                flash("Horarios de búsqueda guardados: " + ", ".join(times)
+                      + " (hora de Colombia).", "ok")
+            else:
+                flash("Búsqueda automática desactivada (no hay horarios). "
+                      "Puedes seguir usando «Buscar ahora».", "ok")
         con.commit()
         con.close()
         if action == "test_notify":
@@ -294,6 +303,7 @@ def settings_page():
         return redirect(url_for("settings_page"))
 
     ai_provider = get_setting(con, "ai_provider", "claude")
+    search_times = parse_times(get_setting(con, "search_times", "12:00"))
     ncfg = notifier.load_config()
     con.close()
 
@@ -320,7 +330,8 @@ def settings_page():
         "channels": notifier.active_channels(ncfg),
     }
     return render_template("settings.html", ai_provider=ai_provider,
-                           providers=providers, notify=notify)
+                           providers=providers, notify=notify,
+                           search_times=search_times)
 
 
 @app.route("/run", methods=["POST"])
@@ -798,23 +809,78 @@ def api_jobs_status():
     return jsonify(total=row["c"], latest=row["m"])
 
 
-def _digest_scheduler():
-    """Hilo de fondo: cada minuto comprueba si toca enviar el resumen diario.
-    `notifier.maybe_send_digest()` es idempotente (usa last_digest_date), así que
-    aunque el proceso reinicie no duplica el envío del día."""
+import threading
+_search_lock = threading.Lock()
+
+
+def parse_times(raw):
+    """'12:00, 18:30' → ['12:00','18:30'] (válidas, normalizadas, sin duplicados)."""
+    out, seen = [], set()
+    for tok in (raw or "").replace(",", " ").split():
+        try:
+            hh, mm = tok.split(":")
+            hh, mm = int(hh), int(mm)
+        except (ValueError, TypeError):
+            continue
+        if 0 <= hh < 24 and 0 <= mm < 60:
+            t = f"{hh:02d}:{mm:02d}"
+            if t not in seen:
+                seen.add(t)
+                out.append(t)
+    return out
+
+
+def _run_search_scheduled(cur):
+    """Ejecuta run_all() en segundo plano, sin solaparse con otra corrida."""
+    if not _search_lock.acquire(blocking=False):
+        print(f"[scheduler] búsqueda ya en curso a las {cur}; se omite", flush=True)
+        return
+    try:
+        total = run_all()
+        print(f"[scheduler] búsqueda programada ({cur}): {total} nuevo(s)", flush=True)
+    except Exception as e:
+        print(f"[scheduler] error en búsqueda programada: {e}", flush=True)
+    finally:
+        _search_lock.release()
+
+
+def _scheduler():
+    """Hilo de fondo (hora local = America/Bogota). Cada minuto:
+      · dispara run_all() a las horas configuradas en `search_times` (una o varias);
+      · comprueba el resumen diario (notifier.maybe_send_digest, idempotente).
+    Idempotencia entre reinicios vía `last_scheduled_run`/`last_digest_date`."""
     import time
+    import datetime as dt
+    last_minute = None
     while True:
         try:
-            sent, msg = notifier.maybe_send_digest()
-            if sent:
-                print(f"[digest] enviado — {msg}", flush=True)
+            now = dt.datetime.now()
+            cur = now.strftime("%H:%M")
+            if cur != last_minute:           # actuar una vez por minuto
+                last_minute = cur
+                stamp = now.strftime("%Y-%m-%d ") + cur
+                con = get_db()
+                times = parse_times(get_setting(con, "search_times", "12:00"))
+                already = get_setting(con, "last_scheduled_run", "") == stamp
+                if cur in times and not already:
+                    set_setting(con, "last_scheduled_run", stamp)
+                    con.close()
+                    threading.Thread(target=_run_search_scheduled, args=(cur,),
+                                     daemon=True).start()
+                else:
+                    con.close()
+                try:
+                    sent, msg = notifier.maybe_send_digest(now)
+                    if sent:
+                        print(f"[digest] enviado — {msg}", flush=True)
+                except Exception as e:
+                    print(f"[digest] error — {e}", flush=True)
         except Exception as e:
-            print(f"[digest] error — {e}", flush=True)
-        time.sleep(60)
+            print(f"[scheduler] error — {e}", flush=True)
+        time.sleep(20)
 
 
 if __name__ == "__main__":
     init_db()
-    import threading
-    threading.Thread(target=_digest_scheduler, daemon=True).start()
+    threading.Thread(target=_scheduler, daemon=True).start()
     app.run(host="0.0.0.0", port=8080, debug=False)

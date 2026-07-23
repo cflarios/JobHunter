@@ -8,7 +8,7 @@
     "sources": 11,
     "db_tables": 8,
     "http_routes": 28,
-    "python_lines": 2820,
+    "python_lines": 2900,
     "template_files": 9,
     "systemd_units": 3,
     "ai_features": 2,
@@ -20,8 +20,9 @@
       "name": "Disparadores",
       "color": "blue",
       "components": [
-        { "name": "jobhunter-search.timer", "detail": "systemd timer, OnCalendar=*-*-* 12:00:00 (America/Bogota), Persistent=true" },
-        { "name": "Usuario · Buscar ahora", "detail": "POST /run desde la UI, manual" }
+        { "name": "Planificador in-app", "detail": "hilo demonio de la app web (app._scheduler): cada minuto lanza run_all() a las horas de settings.search_times (una o varias, configurables en Configuración; por defecto 12:00 America/Bogota) y comprueba el resumen diario. Idempotente vía last_scheduled_run" },
+        { "name": "jobhunter-search.timer (desactivado)", "detail": "el timer systemd fijo a las 12:00 quedó DESACTIVADO; superado por el planificador in-app configurable. Unidades en deploy/ como referencia" },
+        { "name": "Usuario · Buscar ahora", "detail": "POST /run desde la UI, manual (o systemctl start jobhunter-search.service)" }
       ]
     },
     {
@@ -114,7 +115,7 @@
     }
   ],
   "data_flow": [
-    "Timer 12:00 (o Usuario) → run_search.sh → fetcher.run_all()",
+    "Planificador in-app (hilo de la web) a las horas de search_times, o Usuario → fetcher.run_all()",
     "run_search() → 11 fuentes (HTTP; LinkedIn vía RapidAPI) → filtros (blacklist de empresas, título, ubicación, fecha, dedup)",
     "→ INSERT OR IGNORE en jobs + INSERT notificación in-app si hay nuevos",
     "Al terminar run_all(): si hubo empleos nuevos → notifier.send_new_jobs() → despacha a los canales activos (email HTML por SMTP y/o Telegram) en modo inmediato; nunca rompe la búsqueda",
@@ -144,7 +145,7 @@
     { "path": "/run", "method": "POST", "purpose": "Buscar ahora (todas las activas o una)" },
     { "path": "/mark-seen", "method": "POST", "purpose": "Marca todos los empleos como vistos" },
     { "path": "/searches", "method": "GET/POST", "purpose": "Búsquedas: alta, keywords de título, modo ubicación, ventana global, interruptor RapidAPI" },
-    { "path": "/settings", "method": "GET/POST", "purpose": "Configuración: proveedor de IA + claves de API + notificaciones multi-canal (email/SMTP + Telegram) y modos (inmediato / resumen diario), secretos cifrados, envío de prueba" },
+    { "path": "/settings", "method": "GET/POST", "purpose": "Configuración: proveedor de IA + claves de API + notificaciones multi-canal (email/SMTP + Telegram) y modos (inmediato / resumen diario) + programación de búsquedas (horarios del planificador, una o varias horas); secretos cifrados, envío de prueba" },
     { "path": "/notifications", "method": "GET", "purpose": "Historial (marca leídas)" },
     { "path": "/companies", "method": "GET", "purpose": "Empleadores reales agregados del campo company" },
     { "path": "/companies/summary", "method": "POST", "purpose": "Resumen de opiniones vía IA (proveedor activo, JSON si AJAX)" },
@@ -163,8 +164,9 @@
   ],
   "deployment": {
     "web_service": { "unit": "jobhunter-web.service", "exec": ".venv/bin/python app.py", "port": 8080, "restart": "on-failure" },
-    "search_service": { "unit": "jobhunter-search.service", "exec": "run_search.sh", "type": "oneshot" },
-    "search_timer": { "unit": "jobhunter-search.timer", "schedule": "*-*-* 12:00:00 America/Bogota", "persistent": true }
+    "search_service": { "unit": "jobhunter-search.service", "exec": "run_search.sh", "type": "oneshot", "note": "solo corridas manuales; el disparo automático lo hace el planificador in-app" },
+    "search_timer": { "unit": "jobhunter-search.timer", "schedule": "DESACTIVADO — superado por el planificador in-app (settings.search_times, configurable)", "persistent": true },
+    "in_app_scheduler": { "host": "hilo demonio del web service (app._scheduler)", "runs": "run_all() a las horas de settings.search_times (configurables, multi-hora) + resumen diario (notifier.maybe_send_digest)" }
   },
   "files": [
     { "file": "db.py", "role": "Esquema y helpers de SQLite (7 tablas)" },

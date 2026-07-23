@@ -60,6 +60,58 @@
   </details>
 </div>
 
+<!-- ==================== PROGRAMACIÓN ==================== -->
+<div class="card" id="programacion">
+  <h3 style="margin-top:0">⏰ Programación de búsquedas</h3>
+  <p class="muted" style="margin:0 0 12px;font-size:13px;max-width:64ch">
+    La búsqueda se ejecuta automáticamente a estas horas (<b>hora de Colombia</b>).
+    Añade <b>una o varias</b>. Por ejemplo, mañana y tarde para no perderte ofertas
+    recién publicadas.
+  </p>
+  <form method="post" id="sched-form">
+    <input type="hidden" name="action" value="set_schedule">
+    <div id="times-list">
+      {% for t in search_times %}
+      <div class="row time-row" style="gap:8px;margin-bottom:8px;align-items:center">
+        <input type="time" name="times" value="{{ t }}" required style="width:150px">
+        <button type="button" class="btn sm ghost time-del" title="Quitar hora" aria-label="Quitar hora">✕</button>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="row" style="gap:10px;margin-top:6px">
+      <button type="button" class="btn sm ghost" id="time-add">+ Añadir hora</button>
+      <button class="btn" type="submit">Guardar horarios</button>
+    </div>
+  </form>
+  <p class="muted" style="margin:12px 0 0;font-size:12px">
+    La app debe estar encendida a esas horas (lo está siempre en la Pi). Si quitas
+    todas las horas, la búsqueda automática se desactiva y podrás seguir usando el
+    botón <b>«Buscar ahora»</b>. También puedes lanzar cada búsqueda a mano desde
+    <a href="{{ url_for('searches') }}">Búsquedas</a>.
+  </p>
+</div>
+<script>
+(function(){
+  var list=document.getElementById('times-list');
+  var addBtn=document.getElementById('time-add');
+  if(!list||!addBtn) return;
+  function row(val){
+    var d=document.createElement('div');
+    d.className='row time-row';
+    d.style.cssText='gap:8px;margin-bottom:8px;align-items:center';
+    d.innerHTML='<input type="time" name="times" value="'+(val||'')+'" required style="width:150px">'+
+      '<button type="button" class="btn sm ghost time-del" title="Quitar hora" aria-label="Quitar hora">✕</button>';
+    list.appendChild(d);
+  }
+  addBtn.addEventListener('click',function(){ row('09:00'); });
+  list.addEventListener('click',function(e){
+    var b=e.target.closest('.time-del'); if(!b) return;
+    var rows=list.querySelectorAll('.time-row');
+    b.closest('.time-row').remove();
+  });
+})();
+</script>
+
 <!-- ======================= NOTIFICACIONES ======================= -->
 <div class="card" id="notificaciones">
   <div class="row" style="justify-content:space-between;align-items:flex-start">
