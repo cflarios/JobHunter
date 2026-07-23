@@ -292,7 +292,7 @@ def company_summary():
             gd_name = keep_resolved or company
             return jsonify(
                 ok=result["ok"],
-                html=render_template("_review.html", c=c),
+                html=render_template("_review.html", c=c, expanded=True),
                 glassdoor="https://www.glassdoor.com/Search/results.htm?keyword="
                           + quote_plus(gd_name),
                 gd_name=gd_name)
@@ -581,7 +581,7 @@ def job_fit(job_id):
             (job_id, res["score"], res["html"]))
         con.commit()
         con.close()
-        html = render_template("_fitblock.html", detail=res["html"])
+        html = render_template("_fitblock.html", detail=res["html"], expanded=True)
         return jsonify(ok=True, html=html, score=res["score"])
     con.close()
     return jsonify(ok=False, error=res.get("error", "")), 500

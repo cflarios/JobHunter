@@ -1,7 +1,9 @@
-<div style="margin-top:6px;padding:12px 14px;background:var(--card2);border-radius:10px;
-     border-left:3px solid {{ 'var(--accent2)' if c.review_ok else 'var(--warn)' }}">
-  {{ c.review|md }}
-  <div class="muted" style="font-size:11px;margin-top:8px">
-    {{ ('Resumen por ' ~ ai_label ~ ' + búsqueda web') if c.review_ok else 'Aviso' }} · {{ c.review_at }}
+<details class="ai-box {{ 'ok' if c.review_ok else 'warn' }}" {{ 'open' if expanded|default(false) }}>
+  <summary>{{ 'Resumen de opiniones' if c.review_ok else 'Aviso' }}<span class="chev">▾</span></summary>
+  <div class="ai-body">
+    {{ c.review|md }}
+    <div class="muted" style="font-size:11px;margin-top:8px">
+      {{ ('Resumen por ' ~ ai_label ~ ' + búsqueda web · ') if c.review_ok }}{{ c.review_at }}
+    </div>
   </div>
-</div>
+</details>

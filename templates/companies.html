@@ -49,7 +49,8 @@
         <button class="btn sm green" type="submit">{{ '↻ Regenerar' if c.review else '✦ Resumen de opiniones' }}</button>
       </form>
       <form method="post" action="{{ url_for('company_block') }}"
-            onsubmit="return confirm('¿Bloquear «{{ c.name }}»? No aparecerá en las búsquedas y se quitarán sus ofertas guardadas.')">
+            data-confirm="«{{ c.name }}» no aparecerá en las búsquedas y se quitarán sus ofertas ya guardadas."
+            data-confirm-title="Bloquear compañía" data-confirm-label="Bloquear" data-confirm-danger>
         <input type="hidden" name="company" value="{{ c.name }}">
         <button class="btn sm danger" type="submit" title="No mostrar esta empresa en las búsquedas">🚫 Bloquear</button>
       </form>

@@ -1,5 +1,7 @@
-<div style="margin-top:8px;padding:12px 14px;background:var(--card2);border-radius:10px;
-     border-left:3px solid var(--accent)">
-  {{ detail|md }}
-  <div class="muted" style="font-size:11px;margin-top:8px">Análisis por {{ ai_label }} · tu CV vs la oferta</div>
-</div>
+<details class="ai-box" {{ 'open' if expanded|default(false) }}>
+  <summary>¿Encajo aquí? · análisis de tu CV<span class="chev">▾</span></summary>
+  <div class="ai-body">
+    {{ detail|md }}
+    <div class="muted" style="font-size:11px;margin-top:8px">Análisis por {{ ai_label }} · tu CV vs la oferta</div>
+  </div>
+</details>

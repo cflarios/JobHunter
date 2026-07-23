@@ -6,7 +6,8 @@
   <h2 style="margin:0">Mi CV + IA</h2>
   {% if profile %}
   <form method="post" action="{{ url_for('cv_clear') }}"
-        onsubmit="return confirm('¿Borrar tu perfil y las afinidades calculadas?')">
+        data-confirm="Se borrará tu perfil, las afinidades calculadas y el CV generado."
+        data-confirm-title="Borrar perfil" data-confirm-label="Borrar" data-confirm-danger>
     <button class="btn ghost sm" type="submit">Borrar perfil</button>
   </form>
   {% endif %}

@@ -62,6 +62,43 @@ button[disabled]{opacity:.75;cursor:progress}
 .pgbtn.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700;cursor:default}
 .pgbtn[disabled]{opacity:.4;cursor:default}
 .pgdots{color:var(--mut);padding:0 2px}
+/* Modal de confirmación dentro de la página (en vez del confirm() del navegador) */
+.modal-overlay{position:fixed;inset:0;background:rgba(6,10,18,.62);backdrop-filter:blur(2px);
+  display:none;align-items:center;justify-content:center;z-index:100;padding:20px}
+.modal-overlay.open{display:flex}
+.modal{background:var(--card);border:1px solid var(--line);border-radius:14px;
+  max-width:430px;width:100%;padding:22px 22px 18px;
+  box-shadow:0 24px 60px -24px rgba(0,0,0,.85);animation:modalIn .16s ease-out}
+@keyframes modalIn{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
+.modal h4{margin:0 0 8px;font-size:17px}
+.modal p{margin:0 0 18px;color:var(--mut);font-size:14px}
+.modal .row{justify-content:flex-end}
+/* Bloques de IA colapsables (resumen de opiniones, ¿encajo aquí?, etc.) */
+details.ai-box{margin-top:8px;background:var(--card2);border-radius:10px;
+  border-left:3px solid var(--accent);overflow:hidden}
+details.ai-box.ok{border-left-color:var(--accent2)}
+details.ai-box.warn{border-left-color:var(--warn)}
+details.ai-box>summary{list-style:none;cursor:pointer;padding:10px 14px;
+  display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;
+  color:var(--txt);user-select:none}
+details.ai-box>summary::-webkit-details-marker{display:none}
+details.ai-box>summary:hover{background:rgba(255,255,255,.03)}
+details.ai-box>summary .chev{margin-left:auto;color:var(--mut);font-size:11px;
+  transition:transform .18s}
+details.ai-box[open]>summary .chev{transform:rotate(180deg)}
+details.ai-box .ai-body{padding:2px 14px 12px}
+details.ai-box .ai-body>*:first-child{margin-top:0}
+/* Interruptor (toggle switch) reutilizable — color "on" vía --sw-on */
+.switch{display:inline-flex;align-items:center;gap:10px;cursor:pointer;
+  font-size:14px;font-weight:600;user-select:none}
+.switch>input{position:absolute;opacity:0;width:0;height:0}
+.switch .track{position:relative;flex:0 0 auto;width:44px;height:24px;border-radius:24px;
+  background:var(--line);transition:background .18s}
+.switch .knob{position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;
+  background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.4);transition:transform .18s}
+.switch>input:checked+.track{background:var(--sw-on,var(--accent2))}
+.switch>input:checked+.track .knob{transform:translateX(20px)}
+.switch>input:focus-visible+.track{outline:2px solid var(--accent);outline-offset:2px}
 </style>
 <script>
 // Spinner al enviar formularios lentos (marcados con class="busy")
@@ -124,7 +161,65 @@ window.jhPaginate = function(listEl, itemSel, size, pagerEl){
   {% endwith %}
   {% block body %}{% endblock %}
 </div></main>
+
+<div class="modal-overlay" id="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+  <div class="modal">
+    <h4 id="confirm-title">¿Confirmar?</h4>
+    <p id="confirm-msg"></p>
+    <div class="row">
+      <button type="button" class="btn ghost" id="confirm-cancel">Cancelar</button>
+      <button type="button" class="btn danger" id="confirm-ok">Confirmar</button>
+    </div>
+  </div>
+</div>
+
 <script>
+// Confirmación in-page reutilizable. Un <form data-confirm="mensaje"> muestra este
+// modal en vez del confirm() del navegador; con data-confirm-danger usa el estilo
+// destructivo, y data-confirm-title / data-confirm-label personalizan el texto.
+(function(){
+  var overlay = document.getElementById('confirm-modal');
+  var titleEl = document.getElementById('confirm-title');
+  var msgEl   = document.getElementById('confirm-msg');
+  var okBtn   = document.getElementById('confirm-ok');
+  var cancelBtn = document.getElementById('confirm-cancel');
+  var pending = null;
+  function close(){ overlay.classList.remove('open'); pending = null; }
+  function open(opts){
+    titleEl.textContent = opts.title || '¿Confirmar?';
+    msgEl.textContent = opts.message || '';
+    okBtn.textContent = opts.confirmLabel || 'Confirmar';
+    okBtn.className = 'btn ' + (opts.danger ? 'danger' : 'green');
+    pending = opts.onConfirm;
+    overlay.classList.add('open');
+    okBtn.focus();
+  }
+  okBtn.addEventListener('click', function(){ var fn = pending; close(); if(fn) fn(); });
+  cancelBtn.addEventListener('click', close);
+  overlay.addEventListener('click', function(e){ if(e.target === overlay) close(); });
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape' && overlay.classList.contains('open')) close();
+  });
+  window.jhConfirm = open;
+
+  // Intercepta en fase de captura (antes del spinner .busy) los formularios marcados.
+  document.addEventListener('submit', function(e){
+    var f = e.target;
+    if(!f.getAttribute) return;
+    var msg = f.getAttribute('data-confirm');
+    if(!msg) return;
+    e.preventDefault();
+    e.stopPropagation();
+    open({
+      title: f.getAttribute('data-confirm-title') || '¿Confirmar?',
+      message: msg,
+      confirmLabel: f.getAttribute('data-confirm-label') || 'Confirmar',
+      danger: f.hasAttribute('data-confirm-danger'),
+      onConfirm: function(){ f.submit(); }
+    });
+  }, true);
+})();
+
 async function poll(){
   try{const r=await fetch("{{ url_for('api_unread') }}");const d=await r.json();
     const b=document.getElementById('notif-badge');

@@ -72,11 +72,11 @@
     </div>
     <form method="post" id="rapidapi-form">
       <input type="hidden" name="action" value="set_rapidapi">
-      <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;font-weight:600">
+      <label class="switch" style="--sw-on:var(--amber)">
         <input type="checkbox" name="rapidapi" value="1" {{ 'checked' if use_rapidapi }}
-               onchange="document.getElementById('rapidapi-form').submit()"
-               style="width:18px;height:18px;accent-color:var(--amber);cursor:pointer">
-        {{ 'Activadas' if use_rapidapi else 'Desactivadas' }}
+               onchange="document.getElementById('rapidapi-form').submit()">
+        <span class="track"><span class="knob"></span></span>
+        <span>{{ 'Activadas' if use_rapidapi else 'Desactivadas' }}</span>
       </label>
     </form>
   </div>
@@ -114,7 +114,9 @@
           <input type="hidden" name="id" value="{{ s.id }}">
           <button class="btn sm ghost" type="submit">{{ 'Pausar' if s.active else 'Activar' }}</button>
         </form>
-        <form method="post" onsubmit="return confirm('¿Eliminar esta búsqueda y sus empleos?')">
+        <form method="post"
+              data-confirm="Se eliminará la búsqueda «{{ s.query }}» y sus empleos guardados."
+              data-confirm-title="Eliminar búsqueda" data-confirm-label="Eliminar" data-confirm-danger>
           <input type="hidden" name="action" value="delete">
           <input type="hidden" name="id" value="{{ s.id }}">
           <button class="btn sm danger" type="submit">Eliminar</button>
