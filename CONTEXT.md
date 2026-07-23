@@ -2,7 +2,7 @@
 
 > Documento de rumbo. El **README.md** es operativo (cómo se usa/despliega); este
 > archivo guarda el **por qué**, las **decisiones**, los **gotchas** y el **roadmap**
-> para no perder el hilo entre sesiones. Última actualización: 2026-07-22.
+> para no perder el hilo entre sesiones. Última actualización: 2026-07-23.
 
 ---
 
@@ -47,12 +47,13 @@ job-hunter/
 ├── fetcher.py          # 11 fuentes, filtros (título/ubicación/fecha), orquestación
 ├── skills.py           # Extracción de skills técnicas del texto (diccionario curado)
 ├── llm.py              # Capa de proveedor de IA: enruta a Claude o Gemini (ai_provider)
+├── notifier.py         # Notificaciones de empleos nuevos (email SMTP + HTML estético)
 ├── reviews.py          # Resumen de reputación de empresas (IA + búsqueda web/grounding)
 ├── cv.py               # CV + IA: analizar, match, ¿encajo?, carta, mejorar, generar CV
 ├── cvpdf.py            # Renderiza el CV nuevo a PDF (fpdf2 + DejaVu, ≤2 págs)
 ├── run_search.sh       # Wrapper del cron (→ fetcher.py, log en search.log)
-├── templates/          # 8 vistas Jinja2 (base, index, searches, notifications,
-│                       #   companies, cv, _review, _fitblock)
+├── templates/          # 9 vistas Jinja2 (base, index, searches, settings,
+│                       #   notifications, companies, cv, _review, _fitblock)
 ├── deploy/             # Copia de referencia de las unidades systemd (sin secretos)
 ├── architecture.json   # Modelo estructurado del sistema (fuente de verdad)
 ├── architecture.html   # Mapa visual autocontenido (embebe el JSON)
@@ -171,7 +172,7 @@ del título al vuelo.
 
 ## 7. IA con proveedor seleccionable (Claude / Gemini)
 
-**Selector en la UI** (página Búsquedas → "Proveedor de IA"), guardado en
+**Selector en la UI** (página **Configuración** → "Proveedor de IA"), guardado en
 `settings.ai_provider` (por defecto `claude`). Toda la IA pasa por **`llm.py`**,
 que expone `complete(parts, json_out=, max_tokens=, web_search=)` y enruta a:
 - **Claude** (`ANTHROPIC_API_KEY`, modelo `claude-opus-4-8`, override con
@@ -234,6 +235,55 @@ Puede forzarse el proveedor con la env `AI_PROVIDER` en runs manuales.
 
 ---
 
+## 7b. Notificaciones (`notifier.py`) y página Configuración
+
+**Sistema multi-canal y multi-modo.** El aviso **in-app** (tabla `notifications` +
+badge) sigue igual e independiente; email/Telegram son canales **adicionales** que el
+usuario activa. `notifier` despacha a **todos los canales activos y bien configurados**
+(`active_channels(cfg)`).
+
+- **Canales** (el usuario marca los que quiera):
+  - **email (SMTP)** — HTML estético (ver abajo).
+  - **telegram** — mensaje vía **Bot API** (`sendMessage`, `parse_mode=HTML`); usa el
+    subconjunto HTML de Telegram (`<b>`, `<a>`… sin CSS), lista las ofertas con enlace
+    (tope `TG_MAX_JOBS=18`, corta a 4096 chars). Añadir otro canal = una función
+    `_send_x` + rama en `_dispatch`.
+- **Modos de envío** (independientes, se pueden combinar):
+  - **inmediato** (`notify_immediate`, por defecto **on**): al final de
+    `fetcher.run_all()`, si hubo empleos nuevos → `send_new_jobs(all_new_jobs)`. Un
+    **solo** aviso con **todos** los nuevos (acumulados de todas las búsquedas).
+    `run_search()` devuelve ahora `(inserted, seen, new_jobs)` y `run_all()` acumula.
+    En `try/except`: **nunca** rompe la búsqueda; loguea enviada/omitida/error.
+  - **resumen diario** (`notify_digest`, por defecto off; hora `digest_time`, def.
+    `20:00` hora Colombia): `send_daily_digest()` junta lo de hoy
+    (`collect_todays_jobs()`, filtra por `found_at >= date('now','localtime')`).
+    **Lo dispara un hilo demonio en la app web** (`app._digest_scheduler`, cada 60 s →
+    `notifier.maybe_send_digest()`), **idempotente** vía `settings.last_digest_date`
+    (no duplica aunque el proceso reinicie). **No hace falta un timer systemd nuevo**:
+    la app web ya corre siempre.
+- **Email HTML estético** (`notifier.render_email(jobs, url, digest=)`): **tablas +
+  estilos en línea** (Gmail ignora `<style>`/CSS externo), paleta de la app, cabecera
+  JobHunter, hero (🎯 "¡Encontré nuevos empleos!" o 🗓️ "Tu resumen del día"), una
+  tarjeta por oferta (título enlazado, empresa, 📍/💰/🌐, pills de skills, "Ver
+  oferta") y CTA "Ver todos". Alternativa `text/plain` incluida.
+- **Config en `/settings`** (Configuración): interruptor maestro + modos (inmediato,
+  resumen+hora) + por canal su toggle y sus campos. Email: destino + SMTP (host,
+  puerto, usuario, "De", contraseña de app). Telegram: token + chat ID. **Secretos**
+  (`smtp_password`, `telegram_token`) **cifrados** vía `keystore.set_secret(...)`
+  (misma clave maestra Fernet); nunca en texto plano ni visibles. Botón **"Enviar
+  prueba"** (`send_test`, va a los canales listos, ignora el maestro), y borrado de
+  cada secreto. Avisa de canales activados pero incompletos
+  (`email_problems`/`telegram_problems`).
+- **Gmail:** **contraseña de aplicación** (no la normal; requiere verificación en 2
+  pasos), 16 chars (con o sin espacios). Puerto 587 = STARTTLS; 465 = SSL (ambos, el
+  helper detecta por puerto). **Telegram:** token de @BotFather + chat ID de
+  @userinfobot (o ID de grupo/canal con el bot como admin).
+- **La página Configuración** también aloja el **Proveedor de IA** + **Claves de API**
+  (movidos desde Búsquedas). Búsquedas quedó solo con lo suyo (ubicación, RapidAPI,
+  ventana global, alta/edición). Entrada ⚙️ en la nav.
+
+---
+
 ## 8. Base de datos (SQLite `jobs.db`, WAL) — 8 tablas
 
 | Tabla | Para qué |
@@ -242,7 +292,7 @@ Puede forzarse el proveedor con la env `AI_PROVIDER` en runs manuales.
 | `blocked_companies` | Blacklist: empresas que no deben aparecer (name PRIMARY KEY COLLATE NOCASE) |
 | `jobs` | Empleos: title, company, url (unique), source, salary, location, posted_ts, skills, is_new |
 | `notifications` | Avisos de hallazgos (read) |
-| `settings` | Config global (location_mode, max_age_days, last_run…) |
+| `settings` | Config global (location_mode, max_age_days, last_run, ai_provider, use_rapidapi, notify_* [enabled/immediate/digest/digest_time/email_on/telegram_on/email], smtp_*, telegram_chat_id, last_digest_date, app_base_url; `apikey_*`/`secret_smtp_password`/`secret_telegram_token` cifrados) |
 | `company_reviews` | Caché de resúmenes de empresa + resolved_name + glassdoor_url (página directa) |
 | `profile` | Perfil del CV (1 fila): cv_text, role, skills, summary, suggested_keywords, feedback, rewrite, generated_cv (JSON del CV nuevo) |
 | `job_matches` | Afinidad por empleo: score, reason, fit_detail |
@@ -251,8 +301,11 @@ Puede forzarse el proveedor con la env `AI_PROVIDER` en runs manuales.
 
 ## 9. Rutas HTTP principales
 
-Empleos `/` · Buscar ahora `/run` · Búsquedas `/searches` · Notificaciones
-`/notifications` · Compañías `/companies` (+ `/companies/summary`,
+Empleos `/` · Buscar ahora `/run` · Búsquedas `/searches` · **Configuración**
+`/settings` (proveedor de IA + claves + notificaciones/SMTP; POST: `set_provider`,
+`set_apikey`/`clear_apikey`, `set_notify`, `clear_smtp_pass`, `clear_telegram_token`,
+`test_notify`) ·
+Notificaciones `/notifications` · Compañías `/companies` (+ `/companies/summary`,
 `/companies/glassdoor-name`, `/companies/block`, `/companies/unblock`) ·
 **Bloqueos** `/blacklist` (blacklist de compañías, alta manual) ·
 **Mi CV** `/cv` (+ `/cv/analyze`, `/cv/match`, `/cv/improve`, `/cv/apply-keywords`,
@@ -293,8 +346,8 @@ sudo systemctl restart jobhunter-web.service       # tras cambios en app/templat
   activo, la IA degrada con un mensaje que sugiere cambiar de proveedor.
 - Carga: systemd con `EnvironmentFile` **y** `db.py` como fallback (`setdefault`,
   no pisa variables ya definidas) para ejecuciones manuales.
-- **Claves de IA configurables desde la UI** (página Búsquedas → Proveedor de IA →
-  sección **colapsable** "Claves de API"). El `.env` es **solo para desarrollo**
+- **Claves de IA configurables desde la UI** (página **Configuración** → Proveedor
+  de IA → sección **colapsable** "Claves de API"). El `.env` es **solo para desarrollo**
   (fallback); las claves que el usuario registra desde la web se guardan **cifradas
   en la BD** vía **`keystore.py`**:
   - `keystore.set_api_key(provider, value)` cifra con **Fernet** y guarda en
@@ -363,8 +416,10 @@ sudo systemctl restart jobhunter-web.service       # tras cambios en app/templat
 ## 14. Roadmap / próximos pasos
 
 - **Más fuentes de RapidAPI** (el camino ya está preparado con `_rapidapi_get`).
-- **Notificaciones por email** (SMTP con `cristianferlariosm@gmail.com`) cuando
-  aparezcan empleos nuevos — hoy son in-app.
+- ✅ **Notificaciones** por **email (SMTP, HTML estético)** y **Telegram**, en modo
+  **inmediato** y/o **resumen diario** — **hecho** (`notifier.py`, página
+  Configuración; ver §7b). Próximo posible: webhook genérico, adjuntar el CV a medida
+  al email, o filtro por afinidad mínima para notificar solo los mejores matches.
 - **Acceso desde fuera de la LAN** (Tailscale / Cloudflare Tunnel) si se quiere
   consultar desde el móvil con datos.
 - **Guardar un extracto de la descripción** del empleo para mejorar el match del CV.

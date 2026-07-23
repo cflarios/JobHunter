@@ -12,6 +12,7 @@ from fetcher import run_all
 from reviews import generate_company_summary
 import cv as cvai
 import llm
+import notifier
 
 app = Flask(__name__)
 app.secret_key = "job-hunter-local-secret"
@@ -200,7 +201,32 @@ def searches():
             on = "1" if request.form.get("rapidapi") else "0"
             set_setting(con, "use_rapidapi", on)
             flash("Fuentes RapidAPI " + ("activadas." if on == "1" else "desactivadas."), "ok")
-        elif action == "set_provider":
+        con.commit()
+        con.close()
+        return redirect(url_for("searches"))
+
+    rows = con.execute("""
+        SELECT s.*, (SELECT COUNT(*) FROM jobs j WHERE j.search_id=s.id) AS njobs
+        FROM searches s ORDER BY s.active DESC, s.id""").fetchall()
+    max_age = get_setting(con, "max_age_days", "3")
+    location_mode = get_setting(con, "location_mode", "worldwide")
+    use_rapidapi = get_setting(con, "use_rapidapi", "0") == "1"
+    con.close()
+    return render_template("searches.html", searches=rows, max_age=max_age,
+                           location_mode=location_mode, use_rapidapi=use_rapidapi)
+
+
+def _mask_key(k):
+    k = (k or "").strip()
+    return (k[:6] + "…" + k[-4:]) if len(k) > 12 else ("••••" if k else "")
+
+
+@app.route("/settings", methods=["GET", "POST"])
+def settings_page():
+    con = get_db()
+    if request.method == "POST":
+        action = request.form.get("action")
+        if action == "set_provider":
             prov = request.form.get("ai_provider", "claude")
             if prov not in ("claude", "gemini"):
                 prov = "claude"
@@ -222,36 +248,79 @@ def searches():
                 else:
                     keystore.set_api_key(provider, key)  # cifrada en la BD
                     flash(f"Clave de {label} guardada de forma segura.", "ok")
+        elif action == "set_notify":
+            set_setting(con, "notify_enabled", "1" if request.form.get("notify_enabled") else "0")
+            # Modos de envío
+            set_setting(con, "notify_immediate", "1" if request.form.get("notify_immediate") else "0")
+            set_setting(con, "notify_digest", "1" if request.form.get("notify_digest") else "0")
+            dtime = request.form.get("digest_time", "").strip()
+            set_setting(con, "digest_time", dtime or notifier.DEFAULT_DIGEST_TIME)
+            # Canales
+            set_setting(con, "notify_email_on", "1" if request.form.get("notify_email_on") else "0")
+            set_setting(con, "notify_telegram_on", "1" if request.form.get("notify_telegram_on") else "0")
+            # Email
+            set_setting(con, "notify_email", request.form.get("notify_email", "").strip())
+            set_setting(con, "smtp_host", request.form.get("smtp_host", "").strip()
+                        or notifier.DEFAULT_SMTP_HOST)
+            port = request.form.get("smtp_port", "").strip()
+            set_setting(con, "smtp_port", port if port.isdigit() else str(notifier.DEFAULT_SMTP_PORT))
+            set_setting(con, "smtp_user", request.form.get("smtp_user", "").strip())
+            set_setting(con, "smtp_from", request.form.get("smtp_from", "").strip())
+            # Telegram
+            set_setting(con, "telegram_chat_id", request.form.get("telegram_chat_id", "").strip())
+            app_url = request.form.get("app_base_url", "").strip()
+            if app_url:
+                set_setting(con, "app_base_url", app_url)
+            # Secretos: solo se tocan si escriben uno nuevo (cifrados en la BD).
+            pw = request.form.get("smtp_password", "")
+            if pw.strip():
+                keystore.set_secret("smtp_password", pw.strip())
+            tg = request.form.get("telegram_token", "")
+            if tg.strip():
+                keystore.set_secret("telegram_token", tg.strip())
+            flash("Configuración de notificaciones guardada.", "ok")
+        elif action == "clear_smtp_pass":
+            keystore.set_secret("smtp_password", "")
+            flash("Contraseña SMTP borrada.", "ok")
+        elif action == "clear_telegram_token":
+            keystore.set_secret("telegram_token", "")
+            flash("Token de Telegram borrado.", "ok")
         con.commit()
         con.close()
-        return redirect(url_for("searches"))
+        if action == "test_notify":
+            ok, msg = notifier.send_test()
+            flash(("✅ " if ok else "⚠️ ") + msg, "ok")
+            return redirect(url_for("settings_page") + "#notificaciones")
+        return redirect(url_for("settings_page"))
 
-    rows = con.execute("""
-        SELECT s.*, (SELECT COUNT(*) FROM jobs j WHERE j.search_id=s.id) AS njobs
-        FROM searches s ORDER BY s.active DESC, s.id""").fetchall()
-    max_age = get_setting(con, "max_age_days", "3")
-    location_mode = get_setting(con, "location_mode", "worldwide")
-    use_rapidapi = get_setting(con, "use_rapidapi", "0") == "1"
     ai_provider = get_setting(con, "ai_provider", "claude")
+    ncfg = notifier.load_config()
     con.close()
-
-    def _mask(k):
-        k = (k or "").strip()
-        return (k[:6] + "…" + k[-4:]) if len(k) > 12 else ("••••" if k else "")
 
     ak = keystore.get_api_key("anthropic")
     gk = keystore.get_api_key("gemini")
     providers = [
         {"id": "anthropic", "name": "Claude (Anthropic)", "paid": True,
          "get_url": "https://console.anthropic.com/settings/keys",
-         "set": bool(ak), "mask": _mask(ak)},
+         "set": bool(ak), "mask": _mask_key(ak)},
         {"id": "gemini", "name": "Gemini (Google AI Studio)", "paid": False,
          "get_url": "https://aistudio.google.com/apikey",
-         "set": bool(gk), "mask": _mask(gk)},
+         "set": bool(gk), "mask": _mask_key(gk)},
     ]
-    return render_template("searches.html", searches=rows, max_age=max_age,
-                           location_mode=location_mode, use_rapidapi=use_rapidapi,
-                           ai_provider=ai_provider, providers=providers)
+    notify = {
+        "enabled": ncfg["enabled"], "immediate": ncfg["immediate"],
+        "digest": ncfg["digest"], "digest_time": ncfg["digest_time"],
+        "email_on": ncfg["email_on"], "telegram_on": ncfg["telegram_on"],
+        "to": ncfg["to"], "smtp_host": ncfg["smtp_host"], "smtp_port": ncfg["smtp_port"],
+        "smtp_user": ncfg["smtp_user"], "smtp_from": ncfg["smtp_from"],
+        "tg_chat_id": ncfg["tg_chat_id"], "app_url": ncfg["app_url"],
+        "has_pass": bool(ncfg["smtp_pass"]), "has_tg_token": bool(ncfg["tg_token"]),
+        "email_problems": notifier.email_problems(ncfg),
+        "telegram_problems": notifier.telegram_problems(ncfg),
+        "channels": notifier.active_channels(ncfg),
+    }
+    return render_template("settings.html", ai_provider=ai_provider,
+                           providers=providers, notify=notify)
 
 
 @app.route("/run", methods=["POST"])
@@ -729,6 +798,23 @@ def api_jobs_status():
     return jsonify(total=row["c"], latest=row["m"])
 
 
+def _digest_scheduler():
+    """Hilo de fondo: cada minuto comprueba si toca enviar el resumen diario.
+    `notifier.maybe_send_digest()` es idempotente (usa last_digest_date), así que
+    aunque el proceso reinicie no duplica el envío del día."""
+    import time
+    while True:
+        try:
+            sent, msg = notifier.maybe_send_digest()
+            if sent:
+                print(f"[digest] enviado — {msg}", flush=True)
+        except Exception as e:
+            print(f"[digest] error — {e}", flush=True)
+        time.sleep(60)
+
+
 if __name__ == "__main__":
     init_db()
+    import threading
+    threading.Thread(target=_digest_scheduler, daemon=True).start()
     app.run(host="0.0.0.0", port=8080, debug=False)

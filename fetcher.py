@@ -760,20 +760,28 @@ def run_search(con, query, max_age_days=MAX_AGE_DAYS_DEFAULT,
     ).fetchone()["id"]
 
     inserted = 0
+    new_jobs = []          # empleos realmente insertados (para las notificaciones)
     for j in filtered:
         # Skills desde el texto completo (título + descripción + tags de la fuente).
         skills = extract_skills_str(j.get("_text") or j.get("title", ""))
+        title, company, location = (_clean(j["title"]), _clean(j.get("company")),
+                                    _clean(j.get("location")))
         cur = con.execute(
             """INSERT OR IGNORE INTO jobs
                (search_id,title,company,url,source,salary,location,
                 date_posted,posted_ts,skills,is_new)
                VALUES(?,?,?,?,?,?,?,?,?,?,1)""",
-            (search_id, _clean(j["title"]), _clean(j.get("company")), j["url"],
-             j["source"], j.get("salary", ""), _clean(j.get("location")),
+            (search_id, title, company, j["url"],
+             j["source"], j.get("salary", ""), location,
              _fmt_date(j.get("posted_ts")), j.get("posted_ts"), skills),
         )
         if cur.rowcount:
             inserted += 1
+            new_jobs.append({
+                "title": title, "company": company, "url": j["url"],
+                "source": j["source"], "salary": j.get("salary", ""),
+                "location": location, "skills": skills,
+            })
     con.commit()
 
     if inserted:
@@ -783,7 +791,7 @@ def run_search(con, query, max_age_days=MAX_AGE_DAYS_DEFAULT,
              f"(ultimos {max_age_days} dias).",),
         )
         con.commit()
-    return inserted, len(filtered)
+    return inserted, len(filtered), new_jobs
 
 
 def run_all(query_override=None):
@@ -811,12 +819,14 @@ def run_all(query_override=None):
                      "max_age_days": None}]
 
     total_new = 0
+    all_new_jobs = []       # acumulado de todas las búsquedas, para un solo email
     for r in rows:
         q, kws = r["query"], r["title_keywords"]
         age = r["max_age_days"] or max_age  # ventana propia o global por defecto
-        new, seen = run_search(con, q, age, kws, location_mode, use_rapidapi)
+        new, seen, new_jobs = run_search(con, q, age, kws, location_mode, use_rapidapi)
         print(f"  «{q}» (≤{age}d): {seen} coinciden, {new} nuevos")
         total_new += new
+        all_new_jobs.extend(new_jobs)
 
     stamp = dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     con.execute(
@@ -825,6 +835,16 @@ def run_all(query_override=None):
     )
     con.commit()
     con.close()
+
+    # Notificación por el canal configurado (hoy: email). Nunca rompe la búsqueda.
+    if all_new_jobs:
+        try:
+            import notifier
+            ok, msg = notifier.send_new_jobs(all_new_jobs)
+            print(f"  Notificación: {'enviada' if ok else 'omitida'} — {msg}")
+        except Exception as e:
+            print(f"  Notificación: error — {e}")
+
     print(f"[{stamp}] Total nuevos: {total_new}")
     return total_new
 

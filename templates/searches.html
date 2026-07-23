@@ -20,60 +20,6 @@
 </div>
 
 <div class="card">
-  <h3 style="margin-top:0">Proveedor de IA</h3>
-  <p class="muted" style="margin:0 0 10px;font-size:13px">
-    Motor que analiza tu CV, calcula la afinidad y resume las opiniones de empresas.
-  </p>
-  <form method="post" class="row" style="align-items:flex-start">
-    <input type="hidden" name="action" value="set_provider">
-    <select name="ai_provider" style="min-width:320px">
-      <option value="claude" {{ 'selected' if ai_provider=='claude' }}>
-        Claude (Anthropic) — por defecto</option>
-      <option value="gemini" {{ 'selected' if ai_provider=='gemini' }}>
-        Gemini (Google AI Studio) — gratis</option>
-    </select>
-    <button class="btn" type="submit">Guardar</button>
-  </form>
-  <details class="section">
-    <summary>Claves de API<span class="chev">▾</span></summary>
-    <div style="margin-top:4px">
-    {% for p in providers %}
-    <div style="margin-top:12px">
-      <div class="row" style="gap:8px;align-items:center">
-        <span style="font-weight:600">{{ p.name }}</span>
-        {% if p.set %}<span class="pill" style="color:var(--accent2)">✓ configurada · {{ p.mask }}</span>
-        {% else %}<span class="pill" style="color:var(--warn)">no configurada</span>{% endif %}
-        {% if p.paid %}<span class="pill">de pago por uso</span>{% else %}<span class="pill" style="color:var(--accent2)">gratis</span>{% endif %}
-        <a href="{{ p.get_url }}" target="_blank" rel="noopener" style="font-size:13px">Obtener clave ↗</a>
-      </div>
-      <div class="row" style="margin-top:6px;gap:8px">
-        <form method="post" class="row" style="gap:8px;flex:1;min-width:240px" autocomplete="off">
-          <input type="hidden" name="action" value="set_apikey">
-          <input type="hidden" name="provider" value="{{ p.id }}">
-          <input type="password" name="api_key" autocomplete="new-password" spellcheck="false"
-                 placeholder="{{ 'Pega una clave nueva para reemplazarla…' if p.set else 'Pega aquí tu API key…' }}"
-                 style="flex:1;min-width:200px">
-          <button class="btn sm" type="submit" title="Guardar clave" aria-label="Guardar clave"
-                  style="font-size:15px;line-height:1">💾</button>
-        </form>
-        {% if p.set %}
-        <form method="post" data-confirm="Se borrará la clave de {{ p.name }}. La IA con ese proveedor dejará de funcionar hasta que pongas otra."
-              data-confirm-title="Borrar clave" data-confirm-label="Borrar" data-confirm-danger>
-          <input type="hidden" name="action" value="clear_apikey">
-          <input type="hidden" name="provider" value="{{ p.id }}">
-          <button class="btn sm ghost" type="submit" title="Borrar clave" aria-label="Borrar clave"
-                  style="font-size:15px;line-height:1">🗑</button>
-        </form>
-        {% endif %}
-      </div>
-    </div>
-    {% endfor %}
-    <p class="muted" style="margin:12px 0 0;font-size:12px">La clave de <b>Google AI Studio (Gemini)</b> es <b>gratuita</b>; la de <b>Anthropic (Claude)</b> es de pago por uso. Cada proveedor usa su propia clave.</p>
-    </div>
-  </details>
-</div>
-
-<div class="card">
   <h3 style="margin-top:0">Filtro de ubicación</h3>
   <form method="post" class="row" style="align-items:flex-start">
     <input type="hidden" name="action" value="set_location">

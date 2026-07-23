@@ -87,3 +87,46 @@ def key_source(provider):
         if os.environ.get(env):
             return "env"
     return None
+
+
+# --------------------------------------------------------------------------- #
+# Secretos genéricos (no-IA): p. ej. la contraseña SMTP de las notificaciones. #
+# Se guardan cifrados en `settings` bajo la clave `secret_<name>`, con la misma #
+# clave maestra Fernet. Un volcado de la BD solo revela ciphertext.            #
+# --------------------------------------------------------------------------- #
+def _secret_setting(name):
+    return "secret_" + name
+
+
+def set_secret(name, value):
+    """Guarda (cifrado) un secreto arbitrario en la BD. value vacío → lo borra."""
+    con = get_db()
+    key = _secret_setting(name)
+    value = (value or "").strip()
+    if value:
+        token = _fernet().encrypt(value.encode()).decode()
+        set_setting(con, key, token)
+    else:
+        con.execute("DELETE FROM settings WHERE key=?", (key,))
+        con.commit()
+    con.close()
+
+
+def get_secret(name):
+    """Devuelve el secreto descifrado, o None si no está guardado."""
+    con = get_db()
+    enc = get_setting(con, _secret_setting(name))
+    con.close()
+    if not enc:
+        return None
+    try:
+        return _fernet().decrypt(enc.encode()).decode()
+    except Exception:
+        return None
+
+
+def has_secret(name):
+    con = get_db()
+    enc = get_setting(con, _secret_setting(name))
+    con.close()
+    return bool(enc)

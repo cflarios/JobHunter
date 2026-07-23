@@ -1,17 +1,18 @@
 {
   "project": "JobHunter",
   "description": "Buscador personal de empleos remotos auto-alojado en una Raspberry Pi, con emparejamiento de CV por IA. Enfocado en DevOps/SRE remoto (contractor desde Colombia), ampliable a cualquier rol.",
-  "generated": "2026-07-22",
+  "generated": "2026-07-23",
   "host": "Raspberry Pi (Debian 13, Python 3.13) — http://192.168.1.11:8080",
-  "stack": ["Python 3.13", "Flask", "SQLite (WAL)", "systemd", "Claude/Gemini API"],
+  "stack": ["Python 3.13", "Flask", "SQLite (WAL)", "systemd", "Claude/Gemini API", "SMTP (email)", "Telegram Bot API"],
   "metrics": {
     "sources": 11,
     "db_tables": 8,
-    "http_routes": 26,
-    "python_lines": 2390,
-    "template_files": 8,
+    "http_routes": 28,
+    "python_lines": 2820,
+    "template_files": 9,
     "systemd_units": 3,
-    "ai_features": 2
+    "ai_features": 2,
+    "notify_channels": 2
   },
   "layers": [
     {
@@ -76,8 +77,9 @@
       "name": "Capa web (Flask)",
       "color": "violet",
       "components": [
-        { "name": "app.py", "detail": "22 rutas + filtro Markdown seguro + favicon SVG + mapas" },
-        { "name": "templates/", "detail": "Jinja2: base, index, searches, notifications, companies, cv, _review, _fitblock" }
+        { "name": "app.py", "detail": "rutas + filtro Markdown seguro + favicon SVG + mapas + página Configuración (/settings)" },
+        { "name": "notifier.py", "detail": "notificaciones multi-canal (email SMTP con HTML estético + Telegram Bot API) y multi-modo (inmediato tras búsqueda / resumen diario a hora fija). Despacha a todos los canales activos; secretos cifrados vía keystore. El resumen diario lo dispara un hilo demonio de la app web (maybe_send_digest, idempotente)" },
+        { "name": "templates/", "detail": "Jinja2: base, index, searches, settings, notifications, companies, cv, _review, _fitblock" }
       ]
     },
     {
@@ -114,7 +116,9 @@
   "data_flow": [
     "Timer 12:00 (o Usuario) → run_search.sh → fetcher.run_all()",
     "run_search() → 11 fuentes (HTTP; LinkedIn vía RapidAPI) → filtros (blacklist de empresas, título, ubicación, fecha, dedup)",
-    "→ INSERT OR IGNORE en jobs + INSERT notificación si hay nuevos",
+    "→ INSERT OR IGNORE en jobs + INSERT notificación in-app si hay nuevos",
+    "Al terminar run_all(): si hubo empleos nuevos → notifier.send_new_jobs() → despacha a los canales activos (email HTML por SMTP y/o Telegram) en modo inmediato; nunca rompe la búsqueda",
+    "Resumen diario: hilo demonio en la app web (cada 60s) → notifier.maybe_send_digest() → a la hora fijada, junta lo encontrado hoy y despacha a los canales activos; idempotente vía last_digest_date",
     "Flask lee jobs.db → renderiza Empleos/Compañías/Mi CV/Notificaciones",
     "Navegador sondea /api/jobs-status (45s) y /api/unread (30s) para avisar sin recargar",
     "Toda la IA pasa por llm.py, que enruta al proveedor activo (Claude por defecto, o Gemini) según settings.ai_provider",
@@ -139,7 +143,8 @@
     { "path": "/", "method": "GET", "purpose": "Empleos: lista + filtros + % de afinidad + orden por afinidad" },
     { "path": "/run", "method": "POST", "purpose": "Buscar ahora (todas las activas o una)" },
     { "path": "/mark-seen", "method": "POST", "purpose": "Marca todos los empleos como vistos" },
-    { "path": "/searches", "method": "GET/POST", "purpose": "Búsquedas: alta, keywords de título, modo ubicación, ventana, proveedor de IA" },
+    { "path": "/searches", "method": "GET/POST", "purpose": "Búsquedas: alta, keywords de título, modo ubicación, ventana global, interruptor RapidAPI" },
+    { "path": "/settings", "method": "GET/POST", "purpose": "Configuración: proveedor de IA + claves de API + notificaciones multi-canal (email/SMTP + Telegram) y modos (inmediato / resumen diario), secretos cifrados, envío de prueba" },
     { "path": "/notifications", "method": "GET", "purpose": "Historial (marca leídas)" },
     { "path": "/companies", "method": "GET", "purpose": "Empleadores reales agregados del campo company" },
     { "path": "/companies/summary", "method": "POST", "purpose": "Resumen de opiniones vía IA (proveedor activo, JSON si AJAX)" },
@@ -166,6 +171,7 @@
     { "file": "fetcher.py", "role": "11 fuentes (10 públicas + LinkedIn RapidAPI), helper _rapidapi_get, filtros, orquestación" },
     { "file": "app.py", "role": "Servidor Flask, 22 rutas, filtro Markdown, favicon, mapas" },
     { "file": "llm.py", "role": "Capa de proveedor de IA: enruta a Claude o Gemini según settings.ai_provider" },
+    { "file": "notifier.py", "role": "Notificaciones multi-canal (email SMTP + Telegram) y multi-modo (inmediato / resumen diario); secretos cifrados (keystore)" },
     { "file": "reviews.py", "role": "Resumen de opiniones de empresas vía IA (llm.py) + búsqueda web" },
     { "file": "cv.py", "role": "CV + IA: analizar, match, ¿encajo?, carta, mejora, generar CV (llm.py)" },
     { "file": "cvpdf.py", "role": "Renderiza el CV nuevo a PDF (fpdf2 + DejaVu, ≤2 páginas)" },

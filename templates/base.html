@@ -211,6 +211,7 @@ window.jhPaginate = function(listEl, itemSel, size, pagerEl){
     <a href="{{ url_for('cv_page') }}" class="{{ 'active' if request.endpoint=='cv_page' }}" title="Mi CV"><span class="side-ico">📄</span><span class="side-txt">Mi CV</span></a>
     <a href="{{ url_for('searches') }}" class="{{ 'active' if request.endpoint=='searches' }}" title="Búsquedas"><span class="side-ico">🔍</span><span class="side-txt">Búsquedas</span></a>
     <a href="{{ url_for('notifications') }}" class="{{ 'active' if request.endpoint=='notifications' }}" title="Notificaciones"><span class="side-ico">🔔</span><span class="side-txt">Notificaciones</span><span id="notif-badge" class="badge" style="display:none"></span></a>
+    <a href="{{ url_for('settings_page') }}" class="{{ 'active' if request.endpoint=='settings_page' }}" title="Configuración"><span class="side-ico">⚙️</span><span class="side-txt">Configuración</span></a>
   </nav>
   <div class="side-docs">
     <div class="side-label">Documentación</div>
