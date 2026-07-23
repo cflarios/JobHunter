@@ -138,7 +138,9 @@ def improve_cv(profile, cv_text=None):
         '{"feedback": "markdown con 4-6 recomendaciones accionables (logros '
         'cuantificados, verbos de acción, formato ATS, qué quitar/añadir)", '
         '"rewrite": "markdown: un resumen profesional reescrito (3-4 líneas) y 3-5 '
-        'viñetas de logros mejoradas con métricas de ejemplo si faltan"}. En español.\n\n'
+        'viñetas de logros mejoradas con métricas de ejemplo si faltan"}. En español.\n'
+        "FORMATO Markdown permitido: SOLO **negrita** y viñetas con «- ». "
+        "PROHIBIDO usar encabezados (#, ##, ###) o cualquier otro símbolo de título.\n\n"
         + base
     )
     ok, data = _gemini([{"text": instr}], json_out=True, max_tokens=2600)
@@ -148,12 +150,21 @@ def improve_cv(profile, cv_text=None):
             "rewrite": str(data.get("rewrite", ""))}
 
 
-def build_cv(profile):
+def build_cv(profile, lang="es"):
     """Genera un CV nuevo, estructurado y optimizado (ATS/Harvard) a partir del CV
-    original + las recomendaciones ya calculadas. Devuelve {ok, cv} donde `cv` es
-    un dict con las secciones, o {ok:False, error}. No inventa datos: usa solo lo
-    que aparece en el CV/perfil; deja vacío u omite lo que no exista."""
+    original + las recomendaciones ya calculadas. `lang`: 'es' o 'en' (idioma del
+    contenido). Devuelve {ok, cv} donde `cv` es un dict con las secciones, o
+    {ok:False, error}. No inventa datos: usa solo lo que aparece en el CV/perfil;
+    deja vacío u omite lo que no exista."""
     p = profile or {}
+    lang = "en" if lang == "en" else "es"
+    if lang == "en":
+        lang_rule = ("- Write the ENTIRE CV in English (summary, bullets, headline, "
+                     "everything). Translate content from the source if needed.\n")
+        langs_example = '"languages":["Spanish (native)","English (professional)"]'
+    else:
+        lang_rule = "- Redacta TODO el CV en español.\n"
+        langs_example = '"languages":["Español (nativo)","Inglés (profesional)"]'
     fuentes = [f"PERFIL EXTRAÍDO:\n{profile_blob(p)}"]
     if p.get("cv_text"):
         fuentes.append("CV ORIGINAL (texto):\n" + str(p["cv_text"])[:16000])
@@ -171,7 +182,7 @@ def build_cv(profile):
         "vacío (\"\") o la lista vacía; para contacto desconocido usa \"\".\n"
         "- Cuantifica logros cuando la fuente lo permita; verbos de acción; conciso.\n"
         "- Debe caber en 2 páginas: máx. 4 experiencias y máx. 5 viñetas por experiencia.\n"
-        "- En español.\n"
+        + lang_rule +
         "Responde SOLO con este JSON (sin texto alrededor):\n"
         '{"name":"nombre completo o \\"\\"", '
         '"headline":"titular profesional, p. ej. \'DevOps Engineer | SRE\'", '
@@ -181,7 +192,7 @@ def build_cv(profile):
         '"experience":[{"title":"","company":"","location":"","period":"","bullets":["logro cuantificado","..."]}], '
         '"education":[{"degree":"","institution":"","period":""}], '
         '"certifications":["..."], '
-        '"languages":["Español (nativo)","..."]}\n\n'
+        + langs_example + '}\n\n'
         + "\n\n".join(fuentes)
     )
     ok, data = _gemini([{"text": instr}], json_out=True, max_tokens=4000)

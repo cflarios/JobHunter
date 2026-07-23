@@ -35,8 +35,12 @@ def md(text):
     out, in_list = [], False
     for line in str(text).splitlines():
         safe = str(escape(line.strip()))
+        # Encabezados Markdown (#, ##, …): se muestran en negrita, nunca literales.
+        heading = bool(re.match(r"^#{1,6}\s+", safe))
+        if heading:
+            safe = re.sub(r"^#{1,6}\s+", "", safe)
         safe = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", safe)
-        if safe.startswith("- ") or safe.startswith("* "):
+        if not heading and (safe.startswith("- ") or safe.startswith("* ")):
             if not in_list:
                 out.append("<ul>"); in_list = True
             out.append(f"<li>{safe[2:]}</li>")
@@ -44,7 +48,7 @@ def md(text):
             if in_list:
                 out.append("</ul>"); in_list = False
             if safe:
-                out.append(f"<p>{safe}</p>")
+                out.append(f"<p><strong>{safe}</strong></p>" if heading else f"<p>{safe}</p>")
     if in_list:
         out.append("</ul>")
     return Markup("".join(out))
@@ -233,6 +237,8 @@ def companies():
     """).fetchall()
     reviews = {r["company"]: r for r in
                con.execute("SELECT * FROM company_reviews").fetchall()}
+    blocked = [r["name"] for r in con.execute(
+        "SELECT name FROM blocked_companies ORDER BY name COLLATE NOCASE")]
     con.close()
     companies = []
     for r in rows:
@@ -252,7 +258,7 @@ def companies():
             "review_ok": (rev["status"] == "ok") if rev else None,
             "review_at": rev["generated_at"] if rev else None,
         })
-    return render_template("companies.html", companies=companies)
+    return render_template("companies.html", companies=companies, blocked=blocked)
 
 
 @app.route("/companies/summary", methods=["POST"])
@@ -310,6 +316,34 @@ def company_glassdoor_name():
     return redirect(url_for("companies") + f"#c-{quote_plus(company)}")
 
 
+@app.route("/companies/block", methods=["POST"])
+def company_block():
+    company = request.form.get("company", "").strip()
+    if company:
+        con = get_db()
+        con.execute("INSERT OR IGNORE INTO blocked_companies(name) VALUES(?)", (company,))
+        # Elimina los empleos ya guardados de esa empresa (desaparecen del listado).
+        n = con.execute("DELETE FROM jobs WHERE LOWER(TRIM(company))=LOWER(TRIM(?))",
+                        (company,)).rowcount
+        con.commit()
+        con.close()
+        flash(f"«{company}» bloqueada. No volverá a aparecer en las búsquedas"
+              + (f"; se quitaron {n} oferta(s) guardada(s)." if n else "."), "ok")
+    return redirect(url_for("companies"))
+
+
+@app.route("/companies/unblock", methods=["POST"])
+def company_unblock():
+    company = request.form.get("company", "").strip()
+    if company:
+        con = get_db()
+        con.execute("DELETE FROM blocked_companies WHERE name=?", (company,))
+        con.commit()
+        con.close()
+        flash(f"«{company}» desbloqueada.", "ok")
+    return redirect(url_for("companies"))
+
+
 def _load_profile(con):
     row = con.execute("SELECT * FROM profile WHERE id=1").fetchone()
     return dict(row) if row else None
@@ -322,7 +356,9 @@ def cv_page():
     n_jobs = con.execute("SELECT COUNT(*) c FROM jobs").fetchone()["c"]
     n_matches = con.execute("SELECT COUNT(*) c FROM job_matches").fetchone()["c"]
     con.close()
-    return render_template("cv.html", profile=profile, n_jobs=n_jobs, n_matches=n_matches)
+    cv_langs = list(_generated_cv_langs((profile or {}).get("generated_cv")).keys())
+    return render_template("cv.html", profile=profile, n_jobs=n_jobs,
+                           n_matches=n_matches, cv_langs=cv_langs)
 
 
 def _pdf_text(data):
@@ -447,6 +483,23 @@ def cv_improve():
     return redirect(url_for("cv_page"))
 
 
+def _generated_cv_langs(raw):
+    """Parsea profile.generated_cv → {lang: cv_dict}. Tolera el formato antiguo
+    (un único CV plano, sin claves de idioma) asumiéndolo español."""
+    import json
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+    except (ValueError, TypeError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    if any(k in ("es", "en") and isinstance(data.get(k), dict) for k in ("es", "en")):
+        return {k: v for k, v in data.items() if k in ("es", "en") and isinstance(v, dict)}
+    return {"es": data}   # formato antiguo: CV plano → español
+
+
 @app.route("/cv/build", methods=["POST"])
 def cv_build():
     con = get_db()
@@ -455,40 +508,48 @@ def cv_build():
         con.close()
         flash("Primero analiza tu CV.", "ok")
         return redirect(url_for("cv_page"))
-    res = cvai.build_cv(p)
-    if res.get("ok"):
+    choice = request.form.get("cv_lang", "es")
+    langs = ["es", "en"] if choice == "both" else (["en"] if choice == "en" else ["es"])
+    names = {"es": "Español", "en": "English"}
+    built, errors = {}, []
+    for lg in langs:
+        res = cvai.build_cv(p, lg)
+        if res.get("ok"):
+            built[lg] = res["cv"]
+        else:
+            errors.append(f"{names[lg]}: {res.get('error', '')}")
+    if built:
         import json
         con.execute("UPDATE profile SET generated_cv=? WHERE id=1",
-                    (json.dumps(res["cv"], ensure_ascii=False),))
+                    (json.dumps(built, ensure_ascii=False),))
         con.commit()
-        flash("CV nuevo generado. Descárgalo en PDF más abajo.", "ok")
-    else:
-        flash("No se pudo generar el CV: " + res.get("error", ""), "ok")
+        flash("CV nuevo generado (" + ", ".join(names[k] for k in built)
+              + "). Descárgalo en PDF más abajo.", "ok")
+    if errors:
+        flash("No se pudo generar: " + " · ".join(errors), "ok")
     con.close()
     return redirect(url_for("cv_page"))
 
 
 @app.route("/cv/download")
 def cv_download():
-    import json
     from io import BytesIO
     con = get_db()
     p = _load_profile(con)
     con.close()
-    raw = (p or {}).get("generated_cv")
-    if not raw:
+    langs = _generated_cv_langs((p or {}).get("generated_cv"))
+    if not langs:
         flash("Primero genera tu CV nuevo.", "ok")
         return redirect(url_for("cv_page"))
-    try:
-        data = json.loads(raw)
-    except (ValueError, TypeError):
-        flash("El CV generado está dañado; vuelve a generarlo.", "ok")
-        return redirect(url_for("cv_page"))
+    lang = request.args.get("lang", "")
+    if lang not in langs:
+        lang = "es" if "es" in langs else next(iter(langs))
+    data = langs[lang]
     import cvpdf
-    pdf_bytes = cvpdf.render(data)
+    pdf_bytes = cvpdf.render(data, lang=lang)
     safe = "".join(c if c.isalnum() else "_" for c in (data.get("name") or "cv")).strip("_") or "cv"
     return send_file(BytesIO(pdf_bytes), mimetype="application/pdf",
-                     as_attachment=True, download_name=f"CV_{safe}.pdf")
+                     as_attachment=True, download_name=f"CV_{safe}_{lang.upper()}.pdf")
 
 
 @app.route("/cv/clear", methods=["POST"])

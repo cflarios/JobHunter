@@ -16,6 +16,18 @@ INK = (23, 30, 46)         # texto principal
 MUTED = (105, 116, 140)    # texto secundario
 RULE = (210, 216, 228)     # líneas
 
+# Etiquetas de sección por idioma (el contenido ya viene traducido de la IA).
+LABELS = {
+    "es": {"fallback": "Currículum", "summary": "Resumen profesional",
+           "experience": "Experiencia", "skills": "Habilidades",
+           "education": "Educación", "certifications": "Certificaciones",
+           "languages": "Idiomas"},
+    "en": {"fallback": "Curriculum Vitae", "summary": "Professional Summary",
+           "experience": "Experience", "skills": "Skills",
+           "education": "Education", "certifications": "Certifications",
+           "languages": "Languages"},
+}
+
 
 def _s(v):
     """Normaliza a texto seguro (None → '')."""
@@ -76,13 +88,14 @@ class _CV(FPDF):
                         new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
 
-def _build(cv, scale=1.0):
+def _build(cv, scale=1.0, lang="es"):
     """Construye el PDF a una escala dada. Devuelve el objeto FPDF."""
     cv = cv or {}
+    L = LABELS.get(lang, LABELS["es"])
     pdf = _CV(scale=scale)
 
     # -- Cabecera ---------------------------------------------------------- #
-    name = _s(cv.get("name")) or "Currículum"
+    name = _s(cv.get("name")) or L["fallback"]
     pdf.set_font("DejaVu", "B", pdf.z(19))
     pdf.set_text_color(*INK)
     pdf.cell(0, pdf.z(9), name, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
@@ -108,13 +121,13 @@ def _build(cv, scale=1.0):
 
     # -- Resumen ----------------------------------------------------------- #
     if _s(cv.get("summary")):
-        pdf.section("Resumen profesional")
+        pdf.section(L["summary"])
         pdf._text(cv.get("summary"), size=9.4, color=INK, gap=0.5)
 
     # -- Experiencia ------------------------------------------------------- #
     exp = cv.get("experience") or []
     if isinstance(exp, list) and any(isinstance(e, dict) for e in exp):
-        pdf.section("Experiencia")
+        pdf.section(L["experience"])
         for e in exp:
             if not isinstance(e, dict):
                 continue
@@ -137,13 +150,13 @@ def _build(cv, scale=1.0):
     # -- Habilidades ------------------------------------------------------- #
     skills = _clean_list(cv.get("skills"))
     if skills:
-        pdf.section("Habilidades")
+        pdf.section(L["skills"])
         pdf._text("  ·  ".join(skills), size=9.2, color=INK, gap=0.5)
 
     # -- Educación --------------------------------------------------------- #
     edu = cv.get("education") or []
     if isinstance(edu, list) and any(isinstance(x, dict) for x in edu):
-        pdf.section("Educación")
+        pdf.section(L["education"])
         for x in edu:
             if not isinstance(x, dict):
                 continue
@@ -160,7 +173,7 @@ def _build(cv, scale=1.0):
     # -- Certificaciones --------------------------------------------------- #
     certs = _clean_list(cv.get("certifications"))
     if certs:
-        pdf.section("Certificaciones")
+        pdf.section(L["certifications"])
         for c in certs:
             pdf.bullet(c)
         pdf.ln(pdf.z(1.2))
@@ -168,19 +181,19 @@ def _build(cv, scale=1.0):
     # -- Idiomas ----------------------------------------------------------- #
     langs = _clean_list(cv.get("languages"))
     if langs:
-        pdf.section("Idiomas")
+        pdf.section(L["languages"])
         pdf._text("  ·  ".join(langs), size=9.2, color=INK, gap=0)
 
     return pdf
 
 
-def render(cv):
+def render(cv, lang="es"):
     """cv: dict con name/headline/contact/summary/skills/experience/education/
-    certifications/languages. Devuelve bytes del PDF (máx. 2 páginas: si a escala
-    normal se pasa, reintenta compactando)."""
-    pdf = _build(cv, scale=1.0)
+    certifications/languages. `lang`: 'es' o 'en' (etiquetas de sección). Devuelve
+    bytes del PDF (máx. 2 páginas: si a escala normal se pasa, reintenta compactando)."""
+    pdf = _build(cv, scale=1.0, lang=lang)
     if pdf.page_no() > 2:
-        pdf = _build(cv, scale=0.86)   # segundo pase compacto para caber en 2 págs.
+        pdf = _build(cv, scale=0.86, lang=lang)   # segundo pase compacto para 2 págs.
     return bytes(pdf.output())
 
 

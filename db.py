@@ -55,6 +55,10 @@ CREATE TABLE IF NOT EXISTS settings(
     key   TEXT PRIMARY KEY,
     value TEXT
 );
+CREATE TABLE IF NOT EXISTS blocked_companies(
+    name       TEXT PRIMARY KEY COLLATE NOCASE,
+    created_at TEXT DEFAULT (datetime('now','localtime'))
+);
 CREATE TABLE IF NOT EXISTS company_reviews(
     company       TEXT PRIMARY KEY,
     summary       TEXT,

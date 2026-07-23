@@ -9,7 +9,7 @@ Enfocado inicialmente en **DevOps Engineer** (remoto / contractor), ampliable a 
 
 ## Páginas
 - **Empleos** — lista lo encontrado con fuente, salario y fecha de publicación; filtros por texto, búsqueda, fuente y ventana de días; botón "Buscar ahora".
-- **Compañías** — empleadores reales detrás de las ofertas (no las bolsas); enlace a Glassdoor y resumen de opiniones generado por Claude + búsqueda web (ver abajo).
+- **Compañías** — empleadores reales detrás de las ofertas (no las bolsas); enlace a Glassdoor y resumen de opiniones generado por Claude + búsqueda web (ver abajo). Puedes **bloquear** empresas ("🚫 Bloquear") para que no aparezcan más en las búsquedas.
 - **Búsquedas** — añadir/pausar/eliminar términos; palabras clave de título, filtro de ubicación y ventana por búsqueda.
 - **Notificaciones** — historial de hallazgos; badge de no leídas se actualiza cada 30 s.
 
@@ -69,6 +69,7 @@ Sube tu CV (PDF o texto pegado) y la IA (el proveedor activo):
 - **genera un CV nuevo en PDF** ("Generar CV nuevo (PDF)"): reescribe tu currículum
   aplicando las recomendaciones y lo entrega en un PDF descargable de **máx. 2 páginas**
   (`cvpdf.py` con fpdf2). No inventa datos: usa solo lo que aparece en tu CV/perfil.
+  Elige el **idioma**: Español, English o **ambos** (dos PDFs).
 
 El CV se guarda **solo en la Pi** (tablas `profile` y `job_matches`); "Borrar perfil"
 lo elimina. Usa el mismo proveedor de IA que los resúmenes de empresas.

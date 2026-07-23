@@ -6,9 +6,9 @@
   "stack": ["Python 3.13", "Flask", "SQLite (WAL)", "systemd", "Claude/Gemini API"],
   "metrics": {
     "sources": 11,
-    "db_tables": 7,
-    "http_routes": 24,
-    "python_lines": 2290,
+    "db_tables": 8,
+    "http_routes": 26,
+    "python_lines": 2390,
     "template_files": 8,
     "systemd_units": 3,
     "ai_features": 2
@@ -56,6 +56,7 @@
       "name": "Pipeline de filtros (uniforme a todas las fuentes)",
       "color": "green",
       "components": [
+        { "name": "blacklist de empresas", "detail": "descarta empleos cuya empresa esté en blocked_companies (case-insensitive); gestionable desde Compañías" },
         { "name": "title_ok()", "detail": "el TÍTULO debe contener alguna palabra clave del rol (p. ej. devops, sre, site reliability)" },
         { "name": "location_ok()", "detail": "modo worldwide (por defecto) / americas / any; descarta locks a país/estado que excluyen a Colombia" },
         { "name": "ventana de días", "detail": "posted_ts dentro de max_age_days (por búsqueda o global)" },
@@ -104,15 +105,15 @@
         { "name": "cv.py · analyze_fit", "detail": "¿Encajo aquí? por oferta: coincidencias, gaps y qué resaltar" },
         { "name": "cv.py · cover_letter", "detail": "carta de presentación a medida por oferta" },
         { "name": "cv.py · improve_cv", "detail": "feedback estilo Harvard/ATS + resumen y logros reescritos" },
-        { "name": "cv.py · build_cv", "detail": "genera un CV NUEVO en JSON estructurado aplicando las recomendaciones; no inventa datos. Se cachea en profile.generated_cv" },
-        { "name": "cvpdf.py (fpdf2)", "detail": "renderiza el CV nuevo a PDF (DejaVu Sans para acentos); garantiza ≤2 páginas con doble pase. /cv/download lo sirve como adjunto" },
+        { "name": "cv.py · build_cv(lang)", "detail": "genera un CV NUEVO en JSON estructurado aplicando las recomendaciones; no inventa datos. Idioma es/en/ambos (elegible en la UI). Se cachea en profile.generated_cv como {lang: cv}" },
+        { "name": "cvpdf.py (fpdf2)", "detail": "renderiza el CV nuevo a PDF (DejaVu Sans para acentos); títulos de sección localizados (es/en); garantiza ≤2 páginas con doble pase. /cv/download?lang= lo sirve como adjunto" },
         { "name": "ANTHROPIC_API_KEY / GEMINI_API_KEY", "detail": "cada proveedor su propia clave en .env (600, fuera del repo); si falta la del activo, degrada con mensaje" }
       ]
     }
   ],
   "data_flow": [
     "Timer 12:00 (o Usuario) → run_search.sh → fetcher.run_all()",
-    "run_search() → 11 fuentes (HTTP; LinkedIn vía RapidAPI) → filtros (título, ubicación, fecha, dedup)",
+    "run_search() → 11 fuentes (HTTP; LinkedIn vía RapidAPI) → filtros (blacklist de empresas, título, ubicación, fecha, dedup)",
     "→ INSERT OR IGNORE en jobs + INSERT notificación si hay nuevos",
     "Flask lee jobs.db → renderiza Empleos/Compañías/Mi CV/Notificaciones",
     "Navegador sondea /api/jobs-status (45s) y /api/unread (30s) para avisar sin recargar",
@@ -126,6 +127,7 @@
   ],
   "db_schema": {
     "searches": ["id", "query", "title_keywords", "max_age_days", "active", "created_at"],
+    "blocked_companies": ["name (PK, COLLATE NOCASE)", "created_at"],
     "jobs": ["id", "search_id→searches", "title", "company", "url (unique)", "source", "salary", "location", "date_posted", "posted_ts", "found_at", "is_new"],
     "notifications": ["id", "message", "created_at", "read"],
     "settings": ["key", "value"],
@@ -141,12 +143,13 @@
     { "path": "/notifications", "method": "GET", "purpose": "Historial (marca leídas)" },
     { "path": "/companies", "method": "GET", "purpose": "Empleadores reales agregados del campo company" },
     { "path": "/companies/summary", "method": "POST", "purpose": "Resumen de opiniones vía IA (proveedor activo, JSON si AJAX)" },
+    { "path": "/companies/block · /companies/unblock", "method": "POST", "purpose": "Blacklist: bloquear (borra sus ofertas) / desbloquear una empresa" },
     { "path": "/cv", "method": "GET", "purpose": "Mi CV: subir, perfil, afinidad, mejora" },
     { "path": "/cv/analyze", "method": "POST", "purpose": "Analiza el CV (PDF/texto) → perfil" },
     { "path": "/cv/match", "method": "POST", "purpose": "Puntúa todos los empleos contra el perfil" },
     { "path": "/cv/improve", "method": "POST", "purpose": "Mejora del CV (Harvard/ATS)" },
     { "path": "/cv/build", "method": "POST", "purpose": "Genera un CV nuevo (JSON) aplicando las recomendaciones" },
-    { "path": "/cv/download", "method": "GET", "purpose": "Descarga el CV nuevo en PDF (≤2 páginas)" },
+    { "path": "/cv/download?lang=", "method": "GET", "purpose": "Descarga el CV nuevo en PDF (es/en, ≤2 páginas)" },
     { "path": "/cv/apply-keywords", "method": "POST", "purpose": "Aplica keywords sugeridas a la búsqueda activa" },
     { "path": "/jobs/<id>/fit", "method": "POST", "purpose": "¿Encajo aquí? — análisis oferta vs CV (AJAX)" },
     { "path": "/jobs/<id>/cover", "method": "POST", "purpose": "Carta de presentación a medida (AJAX)" },

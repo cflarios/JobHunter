@@ -6,7 +6,22 @@
   <h2 style="margin:0">Compañías que han publicado</h2>
   <span class="muted">{{ companies|length }} empresa(s)</span>
 </div>
-<p class="muted" style="margin-top:0">Empleadores reales detrás de las ofertas (no las bolsas de empleo). Genera un resumen de opiniones o abre su página de Glassdoor.</p>
+<p class="muted" style="margin-top:0">Empleadores reales detrás de las ofertas (no las bolsas de empleo). Genera un resumen de opiniones, abre su Glassdoor o bloquéala para que no aparezca más.</p>
+
+{% if blocked %}
+<div class="card" style="border-color:var(--warn)">
+  <h3 style="margin-top:0">🚫 Compañías bloqueadas ({{ blocked|length }})</h3>
+  <p class="muted" style="margin:0 0 10px;font-size:13px">No aparecen en las búsquedas. Desbloquea para volver a incluirlas (sus ofertas se recuperarán en la próxima búsqueda).</p>
+  <div class="row" style="flex-wrap:wrap;gap:8px">
+    {% for b in blocked %}
+    <form method="post" action="{{ url_for('company_unblock') }}" style="display:inline-flex">
+      <input type="hidden" name="company" value="{{ b }}">
+      <button class="btn sm ghost" type="submit" title="Desbloquear">{{ b }} ✕</button>
+    </form>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
 
 <div id="companies-list">
 {% for c in companies %}
@@ -32,6 +47,11 @@
       <form method="post" action="{{ url_for('company_summary') }}" class="gen-form">
         <input type="hidden" name="company" value="{{ c.name }}">
         <button class="btn sm green" type="submit">{{ '↻ Regenerar' if c.review else '✦ Resumen de opiniones' }}</button>
+      </form>
+      <form method="post" action="{{ url_for('company_block') }}"
+            onsubmit="return confirm('¿Bloquear «{{ c.name }}»? No aparecerá en las búsquedas y se quitarán sus ofertas guardadas.')">
+        <input type="hidden" name="company" value="{{ c.name }}">
+        <button class="btn sm danger" type="submit" title="No mostrar esta empresa en las búsquedas">🚫 Bloquear</button>
       </form>
     </div>
   </div>

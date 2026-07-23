@@ -132,10 +132,12 @@
     {id:'landing', c:2, k:'blue',  t:'Landing.jobs',  s:'API · salario'},
     {id:'getonbrd',c:2, k:'blue',  t:'Get on Board',  s:'API · LATAM'},
     {id:'linkedin',c:2, k:'amber', t:'LinkedIn',      s:'RapidAPI', tag:'key'},
-    {id:'f_title', c:3, k:'green', t:'title_ok()',    s:'rol en el título',  tag:'filtro'},
+    {id:'f_block', c:3, k:'green', t:'blacklist',     s:'empresas bloqueadas', tag:'filtro'},
+    {id:'f_title', c:3, k:'green', t:'title_ok()',    s:'rol en el título'},
     {id:'f_loc',   c:3, k:'green', t:'location_ok()', s:'zona · no geo-lock'},
     {id:'f_win',   c:3, k:'green', t:'ventana',       s:'≤ N días'},
     {id:'f_dedup', c:3, k:'green', t:'dedup',         s:'URL única'},
+    {id:'t_block', c:4, k:'green', t:'blocked_companies',s:'blacklist'},
     {id:'t_jobs',  c:4, k:'green', t:'jobs',          s:'tabla',  tag:'sqlite'},
     {id:'t_notif', c:4, k:'green', t:'notifications', s:'tabla'},
     {id:'t_srch',  c:4, k:'green', t:'searches',      s:'config'},
@@ -161,8 +163,9 @@
   var EDGES = [
     ['timer','run_sh'],['run_sh','run_all'],['user','run_all'],['run_all','run_srch']
   ];
-  SRC.forEach(function(s){ EDGES.push(['run_srch',s]); EDGES.push([s,'f_title']); });
+  SRC.forEach(function(s){ EDGES.push(['run_srch',s]); EDGES.push([s,'f_block']); });
   EDGES.push(
+    ['f_block','f_title'],['t_block','f_block','config'],
     ['f_title','f_loc'],['f_loc','f_win'],['f_win','f_dedup'],['f_dedup','t_jobs'],
     ['run_srch','t_notif','config'],
     ['t_srch','run_all','config'],['t_set','run_all','config'],

@@ -722,12 +722,22 @@ def run_search(con, query, max_age_days=MAX_AGE_DAYS_DEFAULT,
             continue
         raw.extend(src(query))
 
+    # Blacklist de compañías (no deben aparecer en resultados).
+    try:
+        blocked = {r["name"].strip().lower()
+                   for r in con.execute("SELECT name FROM blocked_companies")}
+    except Exception:
+        blocked = set()
+
     seen_urls = set()
     filtered = []
     for j in raw:
         if not j.get("url") or not j.get("title"):
             continue
         if j["url"] in seen_urls:
+            continue
+        comp = (j.get("company") or "").strip().lower()
+        if comp and comp in blocked:
             continue
         if not title_ok(j["title"], title_keywords, query):
             continue

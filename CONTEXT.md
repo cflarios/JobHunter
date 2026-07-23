@@ -43,7 +43,7 @@ replicamos **gratis** con Gemini (ver §7).
 ```
 job-hunter/
 ├── app.py              # Servidor Flask: rutas, filtro Markdown, favicon, mapas
-├── db.py               # Esquema SQLite (7 tablas) + carga de .env (fallback)
+├── db.py               # Esquema SQLite (8 tablas) + carga de .env (fallback)
 ├── fetcher.py          # 11 fuentes, filtros (título/ubicación/fecha), orquestación
 ├── llm.py              # Capa de proveedor de IA: enruta a Claude o Gemini (ai_provider)
 ├── reviews.py          # Resumen de reputación de empresas (IA + búsqueda web/grounding)
@@ -143,6 +143,13 @@ En `fetcher.run_search()`, en este orden:
 3. **Ventana de días** — `posted_ts` dentro de `max_age_days` (por búsqueda o global).
 4. **Dedup** — `INSERT OR IGNORE` por URL única.
 
+También, antes de los filtros anteriores: **blacklist de compañías**
+(`blocked_companies`) — los empleos cuya empresa esté bloqueada se descartan
+(comparación case-insensitive por `name.strip().lower()`). Se gestiona desde la
+página Compañías (botón "🚫 Bloquear" por tarjeta; sección de bloqueadas para
+desbloquear). Al bloquear, `/companies/block` también **borra** los empleos ya
+guardados de esa empresa para que desaparezcan del listado al instante.
+
 Configurable desde la página **Búsquedas** (por búsqueda) y con ajustes globales.
 
 ---
@@ -177,16 +184,24 @@ Puede forzarse el proveedor con la env `AI_PROVIDER` en runs manuales.
   - `analyze_fit` → "¿Encajo aquí?" por oferta (coincidencias, gaps, qué resaltar).
   - `cover_letter` → carta de presentación a medida.
   - `improve_cv` → feedback Harvard/ATS + reescritura.
-  - `build_cv` → **CV NUEVO** en JSON estructurado (name/headline/contact/summary/
-    skills/experience/education/certifications/languages) aplicando las
-    recomendaciones. **No inventa** datos: usa solo lo real del CV/perfil, deja
-    vacío lo que no exista. Se cachea en `profile.generated_cv`.
+  - `build_cv(profile, lang)` → **CV NUEVO** en JSON estructurado (name/headline/
+    contact/summary/skills/experience/education/certifications/languages) aplicando
+    las recomendaciones. **No inventa** datos: usa solo lo real del CV/perfil, deja
+    vacío lo que no exista. `lang` = `es`|`en`. **Idioma elegible en la UI**
+    (Español / English / Ambos): `/cv/build` lee `cv_lang`; para "ambos" genera dos
+    CVs. Se cachea en `profile.generated_cv` como `{lang: cv}` (formato antiguo plano
+    = un solo CV → se trata como `es`; `app._generated_cv_langs()` tolera ambos).
+- **Gotcha de formato:** los prompts que devuelven Markdown (`improve_cv`) piden
+  **no usar encabezados** (`#`, `##`) — solo **negrita** y viñetas. Como red de
+  seguridad, el filtro `md` convierte cualquier línea `#…` en negrita (nunca sale
+  el `##` literal).
 - En subidas PDF, `app._pdf_text()` (pypdf) extrae el texto y lo guarda en
   `profile.cv_text` (el análisis usa el PDF inline; el texto sirve para reconstruir).
 - **PDF del CV nuevo** (`cvpdf.py`, fpdf2 + DejaVu Sans para acentos): `render(cv)`
   dibuja un layout compacto de una columna. **Garantiza ≤2 páginas** con doble pase
-  (si a escala 1.0 excede, reintenta a 0.86). `/cv/build` genera y cachea el JSON;
-  `/cv/download` lo renderiza y sirve como adjunto `CV_<nombre>.pdf`.
+  (si a escala 1.0 excede, reintenta a 0.86). `render(cv, lang)` localiza los
+  títulos de sección (es/en). `/cv/build` genera y cachea el JSON; `/cv/download?lang=`
+  lo renderiza y sirve como adjunto `CV_<nombre>_<LANG>.pdf`.
 - **Etiquetas de proveedor en la UI:** un `@app.context_processor` inyecta `ai_label`
   a todas las plantillas, así los pies "Generado por…", "Análisis por…",
   "Resumen por…" reflejan el proveedor **activo** (antes decían "Gemini" fijo).
@@ -196,11 +211,12 @@ Puede forzarse el proveedor con la env `AI_PROVIDER` en runs manuales.
 
 ---
 
-## 8. Base de datos (SQLite `jobs.db`, WAL) — 7 tablas
+## 8. Base de datos (SQLite `jobs.db`, WAL) — 8 tablas
 
 | Tabla | Para qué |
 |---|---|
 | `searches` | Búsquedas: query, title_keywords, max_age_days, active |
+| `blocked_companies` | Blacklist: empresas que no deben aparecer (name PRIMARY KEY COLLATE NOCASE) |
 | `jobs` | Empleos: title, company, url (unique), source, salary, location, posted_ts, is_new |
 | `notifications` | Avisos de hallazgos (read) |
 | `settings` | Config global (location_mode, max_age_days, last_run…) |
@@ -214,9 +230,9 @@ Puede forzarse el proveedor con la env `AI_PROVIDER` en runs manuales.
 
 Empleos `/` · Buscar ahora `/run` · Búsquedas `/searches` · Notificaciones
 `/notifications` · Compañías `/companies` (+ `/companies/summary`,
-`/companies/glassdoor-name`) · **Mi CV** `/cv` (+ `/cv/analyze`, `/cv/match`,
-`/cv/improve`, `/cv/apply-keywords`, `/cv/build`, `/cv/download`) · por oferta
-`/jobs/<id>/fit` y `/cover` ·
+`/companies/glassdoor-name`, `/companies/block`, `/companies/unblock`) ·
+**Mi CV** `/cv` (+ `/cv/analyze`, `/cv/match`, `/cv/improve`, `/cv/apply-keywords`,
+`/cv/build`, `/cv/download?lang=`) · por oferta `/jobs/<id>/fit` y `/cover` ·
 mapas `/architecture` `/architecture.json` `/workflow` · polling `/api/unread`
 `/api/jobs-status`.
 
