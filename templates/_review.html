@@ -2,6 +2,6 @@
      border-left:3px solid {{ 'var(--accent2)' if c.review_ok else 'var(--warn)' }}">
   {{ c.review|md }}
   <div class="muted" style="font-size:11px;margin-top:8px">
-    {{ 'Resumen por Gemini + Google Search' if c.review_ok else 'Aviso' }} · {{ c.review_at }}
+    {{ ('Resumen por ' ~ ai_label ~ ' + búsqueda web') if c.review_ok else 'Aviso' }} · {{ c.review_at }}
   </div>
 </div>

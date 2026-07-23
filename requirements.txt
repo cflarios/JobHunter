@@ -1,0 +1,6 @@
+# Dependencias de JobHunter (instalar en el venv: ./.venv/bin/pip install -r requirements.txt)
+Flask==3.1.3           # servidor web
+requests==2.34.2       # fuentes de empleo + API de Gemini
+anthropic==0.117.0     # proveedor de IA Claude (por defecto)
+fpdf2==2.8.7           # generación del CV nuevo en PDF
+pypdf==6.14.2          # extracción de texto de CVs en PDF subidos

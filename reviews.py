@@ -1,18 +1,13 @@
 """Genera un resumen de la reputación laboral de una empresa (Glassdoor y otros).
 
-Usa la API de Gemini (Google AI Studio) con grounding de Google Search para
-resumir opiniones públicas. Requiere la variable de entorno GEMINI_API_KEY
-(o GOOGLE_API_KEY); si no está, devuelve un mensaje explicando cómo activarlo.
+Usa el proveedor de IA activo (Claude o Gemini, ver llm.py) con búsqueda web /
+grounding para resumir opiniones públicas. El proveedor se elige desde la UI
+(por defecto Claude). Si falta la clave del proveedor activo, devuelve un
+mensaje explicando cómo activarlo.
 """
-import os
 import re
 
-import requests
-
-MODEL = "gemini-2.5-flash"
-ENDPOINT = ("https://generativelanguage.googleapis.com/v1beta/models/"
-            "{model}:generateContent")
-TIMEOUT = 60
+import llm
 
 # Frases de preámbulo que a veces anteceden al resumen y hay que descartar.
 _PREAMBLE_RE = re.compile(
@@ -53,14 +48,25 @@ def _prompt(company):
 
 
 def _parse(text):
-    """Extrae el nombre resuelto (línea EMPRESA:) y limpia el preámbulo."""
-    # Quitar marcadores de cita del grounding, p. ej. "[cite: 3, 7]".
+    """Extrae el nombre resuelto (línea EMPRESA:) y limpia el preámbulo.
+
+    Tolera artefactos de grounding de ambos proveedores: marcadores `[cite: 3]`
+    de Gemini y etiquetas `<cite index="...">…</cite>` de Claude, además de la
+    narración que Claude a veces intercala entre búsquedas antes del resumen."""
+    # Quitar etiquetas de cita HTML de Claude, conservando su texto interior.
+    text = re.sub(r"</?cite[^>]*>", "", text)
+    # Quitar marcadores de cita de Gemini, p. ej. "[cite: 3, 7]".
     text = re.sub(r"\s*\[cite[^\]]*\]", "", text)
+
     resolved = None
+    # La línea EMPRESA: puede venir precedida de narración; cortamos desde ella.
+    m = re.search(r"EMPRESA:\s*(.+)", text)
+    if m:
+        # Nombre resuelto = resto de la línea de EMPRESA:.
+        resolved = m.group(1).splitlines()[0].strip() or None
+        text = text[m.end():]
+
     lines = text.strip().splitlines()
-    if lines and lines[0].strip().upper().startswith("EMPRESA:"):
-        resolved = lines[0].split(":", 1)[1].strip() or None
-        lines = lines[1:]
     # Descartar líneas en blanco iniciales.
     while lines and not lines[0].strip():
         lines.pop(0)
@@ -74,56 +80,17 @@ def _parse(text):
 
 def generate_company_summary(company):
     """Devuelve dict {ok, summary, resolved}. Nunca lanza excepción."""
-    api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-    if not api_key:
-        return {
-            "ok": False, "resolved": None,
-            "summary": (
-                "El resumen automático de opiniones requiere una **API key de "
-                "Google AI Studio (Gemini)**. Define `GEMINI_API_KEY` en el "
-                "servicio (ver README) y reinicia. Mientras tanto, usa el botón "
-                "**Ver en Glassdoor**."
-            ),
-        }
-    try:
-        payload = {
-            "contents": [{"parts": [{"text": _prompt(company)}]}],
-            "tools": [{"google_search": {}}],
-            "generationConfig": {
-                "temperature": 0.3,
-                "maxOutputTokens": 2048,
-                # Gemini 2.5 gasta tokens de "thinking" que cuentan contra el
-                # límite y truncan el resumen; lo desactivamos.
-                "thinkingConfig": {"thinkingBudget": 0},
-            },
-        }
-        r = requests.post(
-            ENDPOINT.format(model=MODEL),
-            params={"key": api_key}, json=payload, timeout=TIMEOUT,
-        )
-        if r.status_code != 200:
-            msg = r.json().get("error", {}).get("message", r.text[:200]) \
-                if r.headers.get("content-type", "").startswith("application/json") \
-                else r.text[:200]
-            return {"ok": False, "resolved": None,
-                    "summary": f"Error de la API de Gemini ({r.status_code}): {msg}"}
-
-        data = r.json()
-        cands = data.get("candidates") or []
-        if not cands:
-            fb = data.get("promptFeedback", {})
-            return {"ok": False, "resolved": None,
-                    "summary": f"Sin respuesta de Gemini ({fb.get('blockReason', 'motivo desconocido')})."}
-        parts = (cands[0].get("content") or {}).get("parts") or []
-        raw = "".join(p.get("text", "") for p in parts).strip()
-        if not raw:
-            return {"ok": False, "resolved": None, "summary": "Gemini no devolvió texto."}
-        resolved, summary = _parse(raw)
-        return {"ok": True, "resolved": resolved, "summary": summary or raw}
-    except requests.exceptions.RequestException as e:
-        return {"ok": False, "resolved": None, "summary": f"Error de red al consultar Gemini: {e}"}
-    except Exception as e:
-        return {"ok": False, "resolved": None, "summary": f"Error al generar el resumen: {e}"}
+    ok, data = llm.complete([{"text": _prompt(company)}], json_out=False,
+                            max_tokens=2048, web_search=True)
+    if not ok:
+        return {"ok": False, "resolved": None,
+                "summary": (data + "\n\nMientras tanto, usa el botón "
+                            "**Ver en Glassdoor**.")}
+    raw = (data or "").strip()
+    if not raw:
+        return {"ok": False, "resolved": None, "summary": "El modelo no devolvió texto."}
+    resolved, summary = _parse(raw)
+    return {"ok": True, "resolved": resolved, "summary": summary or raw}
 
 
 if __name__ == "__main__":

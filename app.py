@@ -10,9 +10,19 @@ from db import get_db, init_db, get_setting, set_setting
 from fetcher import run_all
 from reviews import generate_company_summary
 import cv as cvai
+import llm
 
 app = Flask(__name__)
 app.secret_key = "job-hunter-local-secret"
+
+
+@app.context_processor
+def inject_ai_provider():
+    """Expone el proveedor de IA activo y su etiqueta a todas las plantillas."""
+    con = get_db()
+    prov = get_setting(con, "ai_provider", "claude")
+    con.close()
+    return {"ai_provider": prov, "ai_label": llm.provider_label(prov)}
 
 
 @app.template_filter("md")
@@ -177,6 +187,12 @@ def searches():
             on = "1" if request.form.get("rapidapi") else "0"
             set_setting(con, "use_rapidapi", on)
             flash("Fuentes RapidAPI " + ("activadas." if on == "1" else "desactivadas."), "ok")
+        elif action == "set_provider":
+            prov = request.form.get("ai_provider", "claude")
+            if prov not in ("claude", "gemini"):
+                prov = "claude"
+            set_setting(con, "ai_provider", prov)
+            flash("Proveedor de IA actualizado a " + llm.provider_label(prov) + ".", "ok")
         con.commit()
         con.close()
         return redirect(url_for("searches"))
@@ -187,9 +203,11 @@ def searches():
     max_age = get_setting(con, "max_age_days", "3")
     location_mode = get_setting(con, "location_mode", "worldwide")
     use_rapidapi = get_setting(con, "use_rapidapi", "0") == "1"
+    ai_provider = get_setting(con, "ai_provider", "claude")
     con.close()
     return render_template("searches.html", searches=rows, max_age=max_age,
-                           location_mode=location_mode, use_rapidapi=use_rapidapi)
+                           location_mode=location_mode, use_rapidapi=use_rapidapi,
+                           ai_provider=ai_provider)
 
 
 @app.route("/run", methods=["POST"])
@@ -307,6 +325,17 @@ def cv_page():
     return render_template("cv.html", profile=profile, n_jobs=n_jobs, n_matches=n_matches)
 
 
+def _pdf_text(data):
+    """Extrae el texto de un PDF (bytes). Devuelve '' si no se puede."""
+    try:
+        from io import BytesIO
+        from pypdf import PdfReader
+        reader = PdfReader(BytesIO(data))
+        return "\n".join((pg.extract_text() or "") for pg in reader.pages).strip()
+    except Exception:
+        return ""
+
+
 @app.route("/cv/analyze", methods=["POST"])
 def cv_analyze():
     import base64
@@ -317,6 +346,9 @@ def cv_analyze():
         data = f.read(6 * 1024 * 1024)  # tope 6 MB
         if f.filename.lower().endswith(".pdf") or (f.mimetype or "").endswith("pdf"):
             pdf_b64 = base64.standard_b64encode(data).decode()
+            # También extraemos el texto para poder reconstruir el CV más tarde
+            # (el análisis usa el PDF inline; el guardado usa este texto).
+            text = text or _pdf_text(data)
         else:
             try:
                 text = text or data.decode("utf-8", "ignore")
@@ -336,7 +368,7 @@ def cv_analyze():
                ON CONFLICT(id) DO UPDATE SET cv_text=excluded.cv_text,role=excluded.role,
                  seniority=excluded.seniority,years=excluded.years,skills=excluded.skills,
                  summary=excluded.summary,suggested_keywords=excluded.suggested_keywords,
-                 feedback=NULL,rewrite=NULL,updated_at=excluded.updated_at""",
+                 feedback=NULL,rewrite=NULL,generated_cv=NULL,updated_at=excluded.updated_at""",
             (text[:20000] if text else None, res["role"], res["seniority"], res["years"],
              res["skills"], res["summary"], res["suggested_keywords"]))
         con.commit()
@@ -413,6 +445,50 @@ def cv_improve():
         flash("No se pudo mejorar el CV: " + res.get("error", ""), "ok")
     con.close()
     return redirect(url_for("cv_page"))
+
+
+@app.route("/cv/build", methods=["POST"])
+def cv_build():
+    con = get_db()
+    p = _load_profile(con)
+    if not p:
+        con.close()
+        flash("Primero analiza tu CV.", "ok")
+        return redirect(url_for("cv_page"))
+    res = cvai.build_cv(p)
+    if res.get("ok"):
+        import json
+        con.execute("UPDATE profile SET generated_cv=? WHERE id=1",
+                    (json.dumps(res["cv"], ensure_ascii=False),))
+        con.commit()
+        flash("CV nuevo generado. Descárgalo en PDF más abajo.", "ok")
+    else:
+        flash("No se pudo generar el CV: " + res.get("error", ""), "ok")
+    con.close()
+    return redirect(url_for("cv_page"))
+
+
+@app.route("/cv/download")
+def cv_download():
+    import json
+    from io import BytesIO
+    con = get_db()
+    p = _load_profile(con)
+    con.close()
+    raw = (p or {}).get("generated_cv")
+    if not raw:
+        flash("Primero genera tu CV nuevo.", "ok")
+        return redirect(url_for("cv_page"))
+    try:
+        data = json.loads(raw)
+    except (ValueError, TypeError):
+        flash("El CV generado está dañado; vuelve a generarlo.", "ok")
+        return redirect(url_for("cv_page"))
+    import cvpdf
+    pdf_bytes = cvpdf.render(data)
+    safe = "".join(c if c.isalnum() else "_" for c in (data.get("name") or "cv")).strip("_") or "cv"
+    return send_file(BytesIO(pdf_bytes), mimetype="application/pdf",
+                     as_attachment=True, download_name=f"CV_{safe}.pdf")
 
 
 @app.route("/cv/clear", methods=["POST"])

@@ -13,22 +13,20 @@ Enfocado inicialmente en **DevOps Engineer** (remoto / contractor), ampliable a 
 - **Búsquedas** — añadir/pausar/eliminar términos; palabras clave de título, filtro de ubicación y ventana por búsqueda.
 - **Notificaciones** — historial de hallazgos; badge de no leídas se actualiza cada 30 s.
 
-## Resumen de opiniones (Glassdoor) — usa Gemini (Google AI Studio)
-El botón "Resumen de opiniones" en la página **Compañías** usa la API de **Gemini**
-(`gemini-2.5-flash`) con *grounding* de Google Search para resumir la reputación de
-la empresa (calificación de Glassdoor/Indeed, pros, contras, veredicto). Se cachea
-en la BD. Glassdoor no tiene API pública gratuita ni permite scraping, por eso se
-resume desde fuentes públicas vía Gemini.
+## Proveedor de IA seleccionable (Claude / Gemini)
+Toda la IA (resúmenes de empresas y CV) usa un **proveedor elegible desde la UI**
+(página **Búsquedas** → "Proveedor de IA"), por defecto **Claude** (Anthropic,
+`claude-opus-4-8`); **Gemini** (`gemini-2.5-flash`) queda como alternativa gratis.
+El botón "Resumen de opiniones" en **Compañías** resume la reputación (Glassdoor/
+Indeed: calificación, pros, contras, veredicto) con búsqueda web / *grounding*;
+se cachea en la BD. Glassdoor no tiene API pública gratuita ni permite scraping.
 
-La API key se guarda como variable de entorno del servicio (no en el código), en un
-override de systemd propiedad de root:
+Cada proveedor usa su propia clave, en el `.env` del servicio (no en el código):
+`ANTHROPIC_API_KEY` para Claude y `GEMINI_API_KEY` para Gemini. Copia `.env.example`
+a `.env`, rellena las que uses y reinicia:
 
 ```bash
-sudo mkdir -p /etc/systemd/system/jobhunter-web.service.d
-printf '[Service]\nEnvironment=GEMINI_API_KEY=TU-KEY\n' | \
-  sudo tee /etc/systemd/system/jobhunter-web.service.d/apikey.conf
-sudo chmod 600 /etc/systemd/system/jobhunter-web.service.d/apikey.conf
-sudo systemctl daemon-reload && sudo systemctl restart jobhunter-web.service
+sudo systemctl restart jobhunter-web.service
 ```
 
 Sin la key, el enlace a Glassdoor funciona igual; solo el resumen automático queda
@@ -61,16 +59,19 @@ Añadir otra fuente de RapidAPI = escribir `fetch_x(query)` que llame a
 `_rapidapi_get(...)` y agregarla a `SOURCES`. Si falta la key, esas fuentes se
 omiten en silencio.
 
-## Mi CV + IA (Gemini) — pestaña "Mi CV"
-Sube tu CV (PDF o texto pegado) y Gemini:
+## Mi CV + IA — pestaña "Mi CV"
+Sube tu CV (PDF o texto pegado) y la IA (el proveedor activo):
 - extrae tu **perfil** (rol, seniority, años, skills) y sugiere palabras clave de título;
 - puntúa cada empleo por **afinidad 0–100** (badge y orden en la pestaña Empleos);
 - **"¿Encajo aquí?"** por oferta: coincidencias, gaps y qué resaltar;
 - **carta de presentación** a medida por oferta;
-- **mejora tu CV** (estilo Harvard/ATS): recomendaciones + resumen y logros reescritos.
+- **mejora tu CV** (estilo Harvard/ATS): recomendaciones + resumen y logros reescritos;
+- **genera un CV nuevo en PDF** ("Generar CV nuevo (PDF)"): reescribe tu currículum
+  aplicando las recomendaciones y lo entrega en un PDF descargable de **máx. 2 páginas**
+  (`cvpdf.py` con fpdf2). No inventa datos: usa solo lo que aparece en tu CV/perfil.
 
 El CV se guarda **solo en la Pi** (tablas `profile` y `job_matches`); "Borrar perfil"
-lo elimina. Usa la misma `GEMINI_API_KEY` que los resúmenes de empresas.
+lo elimina. Usa el mismo proveedor de IA que los resúmenes de empresas.
 
 Para añadir una fuente: crear una función `fetch_x(query)` en `fetcher.py` que
 devuelva dicts con las claves title/company/url/source/salary/location/posted_ts,

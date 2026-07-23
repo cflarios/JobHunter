@@ -20,6 +20,28 @@
 </div>
 
 <div class="card">
+  <h3 style="margin-top:0">Proveedor de IA</h3>
+  <p class="muted" style="margin:0 0 10px;font-size:13px">
+    Motor que analiza tu CV, calcula la afinidad y resume las opiniones de empresas.
+  </p>
+  <form method="post" class="row" style="align-items:flex-start">
+    <input type="hidden" name="action" value="set_provider">
+    <select name="ai_provider" style="min-width:320px">
+      <option value="claude" {{ 'selected' if ai_provider=='claude' }}>
+        Claude (Anthropic) — por defecto</option>
+      <option value="gemini" {{ 'selected' if ai_provider=='gemini' }}>
+        Gemini (Google AI Studio) — gratis</option>
+    </select>
+    <button class="btn" type="submit">Guardar</button>
+  </form>
+  <p class="muted" style="margin:10px 0 0;font-size:13px">
+    <b>Claude</b> usa tu clave de Anthropic (<code>ANTHROPIC_API_KEY</code>);
+    <b>Gemini</b> usa la de Google AI Studio (<code>GEMINI_API_KEY</code>). Cada
+    proveedor requiere su propia clave en el <code>.env</code>.
+  </p>
+</div>
+
+<div class="card">
   <h3 style="margin-top:0">Filtro de ubicación</h3>
   <form method="post" class="row" style="align-items:flex-start">
     <input type="hidden" name="action" value="set_location">

@@ -174,12 +174,12 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
     <h1>Job<span class="dot">Hunter</span></h1>
     <p class="thesis">Buscador personal de empleos remotos. Cada mediodía barre 11 bolsas de trabajo
     (10 públicas + LinkedIn vía RapidAPI), filtra por rol, zona y frescura, guarda lo nuevo y te avisa.
-    Con IA (Gemini): resume la reputación de cada empresa y empareja tu CV con las ofertas (afinidad,
-    ¿encajo?, carta, mejora de CV). Enfocado en DevOps/SRE remoto desde Colombia, ampliable a cualquier rol.</p>
+    Con IA (proveedor seleccionable, Claude por defecto): resume la reputación de cada empresa y empareja tu CV
+    con las ofertas (afinidad, ¿encajo?, carta, mejora y CV nuevo en PDF). Enfocado en DevOps/SRE remoto desde Colombia, ampliable a cualquier rol.</p>
     <div class="chips">
       <div class="chip"><div class="n">11</div><div class="l">Fuentes</div></div>
       <div class="chip"><div class="n">7</div><div class="l">Tablas SQLite</div></div>
-      <div class="chip"><div class="n">22</div><div class="l">Rutas HTTP</div></div>
+      <div class="chip"><div class="n">24</div><div class="l">Rutas HTTP</div></div>
       <div class="chip"><div class="n">~1.7k</div><div class="l">Líneas de código</div></div>
       <div class="chip"><div class="n">3</div><div class="l">Unidades systemd</div></div>
       <div class="chip"><div class="n">6</div><div class="l">Funciones IA</div></div>
@@ -299,7 +299,7 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
           <div class="stage-head"><span class="stage-title">Rama · Resumen de opiniones</span><span class="stage-tag">externo · bajo demanda</span></div>
           <div class="nodes">
             <div class="node"><b>POST /companies/summary</b><span class="d">botón AJAX con spinner</span></div>
-            <div class="node"><b>reviews.py → Gemini 2.5 Flash</b><span class="d">grounding con Google Search · thinkingBudget=0 (evita truncar)</span></div>
+            <div class="node"><b>reviews.py → llm.py → IA</b><span class="d">proveedor activo con búsqueda web/grounding (Claude web_search o Gemini google_search)</span></div>
             <div class="node"><b>company_reviews</b><span class="d">cachea el resumen + nombre canónico para Glassdoor</span></div>
           </div>
         </div>
@@ -310,12 +310,13 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
       <div class="stage" data-c="amber" style="margin-bottom:0">
         <div class="num">↳</div>
         <div class="stage-card">
-          <div class="stage-head"><span class="stage-title">Rama · CV + IA</span><span class="stage-tag">externo · Gemini</span></div>
+          <div class="stage-head"><span class="stage-title">Rama · CV + IA</span><span class="stage-tag">externo · Claude/Gemini</span></div>
           <div class="nodes">
             <div class="node"><b>Mi CV · /cv/analyze</b><span class="d">sube PDF o texto → cv.py.analyze_cv → tabla <b>profile</b> (rol, skills, keywords)</span></div>
             <div class="node"><b>/cv/match</b><span class="d">cv.py.match_jobs(perfil, jobs) → tabla <b>job_matches</b> → Empleos ordenado por afinidad</span></div>
             <div class="node"><b>/jobs/{id}/fit · /cover</b><span class="d">¿encajo? y carta de presentación por oferta (AJAX)</span></div>
             <div class="node"><b>/cv/improve</b><span class="d">feedback Harvard/ATS + reescritura → profile.feedback/rewrite</span></div>
+            <div class="node"><b>/cv/build · /cv/download</b><span class="d">CV nuevo (cv.build_cv → profile.generated_cv) → cvpdf.py → PDF ≤2 págs descargable</span></div>
           </div>
         </div>
       </div>
@@ -355,6 +356,8 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
         <tr><td class="path">/cv/analyze</td><td class="method">POST</td><td>Analiza el CV (PDF/texto) → perfil</td></tr>
         <tr><td class="path">/cv/match</td><td class="method">POST</td><td>Puntúa todos los empleos contra el perfil (0–100)</td></tr>
         <tr><td class="path">/cv/improve</td><td class="method">POST</td><td>Mejora del CV (Harvard/ATS)</td></tr>
+        <tr><td class="path">/cv/build</td><td class="method">POST</td><td>Genera un CV nuevo (JSON) aplicando las recomendaciones</td></tr>
+        <tr><td class="path">/cv/download</td><td class="method">GET</td><td>Descarga el CV nuevo en PDF (≤2 páginas)</td></tr>
         <tr><td class="path">/jobs/&lt;id&gt;/fit</td><td class="method">POST</td><td>¿Encajo aquí? — oferta vs CV (AJAX)</td></tr>
         <tr><td class="path">/jobs/&lt;id&gt;/cover</td><td class="method">POST</td><td>Carta de presentación a medida (AJAX)</td></tr>
         <tr><td class="path">/architecture · /workflow</td><td class="method">GET</td><td>Mapas de arquitectura y flujo</td></tr>
@@ -382,13 +385,15 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
   </section>
 
   <section class="blk">
-    <h2 class="sec">CV + IA — Mi CV (Gemini)</h2>
+    <h2 class="sec">CV + IA — Mi CV</h2>
+    <p class="muted" style="font-size:12.5px;margin:-4px 0 12px">Toda la IA pasa por <span class="mono">llm.py</span>, que enruta al <b>proveedor seleccionable</b> desde la página Búsquedas — <b>Claude</b> (Anthropic, <span class="mono">claude-opus-4-8</span>) por defecto o <b>Gemini</b> (Google) como alternativa gratis. Guardado en <span class="mono">settings.ai_provider</span>.</p>
     <div class="cards">
       <div class="card"><h3>Perfil desde el CV</h3><p><span class="k">cv.py · analyze_cv</span> · lee PDF (inline) o texto → rol, seniority, años, skills y palabras clave sugeridas.</p></div>
       <div class="card"><h3>Afinidad 0–100</h3><p><span class="k">cv.py · match_jobs</span> · puntúa cada empleo contra el perfil; badge y orden por afinidad en Empleos.</p></div>
       <div class="card"><h3>¿Encajo aquí?</h3><p><span class="k">cv.py · analyze_fit</span> · por oferta: coincidencias, gaps y qué resaltar al postular.</p></div>
       <div class="card"><h3>Carta de presentación</h3><p><span class="k">cv.py · cover_letter</span> · carta a medida por oferta, editable antes de enviar.</p></div>
       <div class="card"><h3>Mejora de CV</h3><p><span class="k">cv.py · improve_cv</span> · feedback Harvard/ATS + resumen y logros reescritos.</p></div>
+      <div class="card"><h3>CV nuevo en PDF</h3><p><span class="k">cv.py · build_cv</span> + <span class="k">cvpdf.py</span> · reescribe el CV aplicando las recomendaciones y lo entrega en PDF descargable (fpdf2, máx. 2 páginas). No inventa datos.</p></div>
       <div class="card"><h3>Privacidad</h3><p>El CV se guarda <b>solo en la Pi</b> (tablas <span class="k">profile</span> / <span class="k">job_matches</span>); "Borrar perfil" lo elimina.</p></div>
     </div>
   </section>
@@ -405,9 +410,9 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
   <section class="blk">
     <h2 class="sec">Seguridad y datos</h2>
     <ul class="list sec-list">
-      <li><b>Sin secretos en el repo.</b> <span class="mono">GEMINI_API_KEY</span> y <span class="mono">RAPIDAPI_KEY</span> viven en un <span class="mono">.env</span> (600, no versionado); systemd lo carga con <span class="mono">EnvironmentFile</span> y <span class="mono">db.py</span> como respaldo.</li>
+      <li><b>Sin secretos en el repo.</b> <span class="mono">ANTHROPIC_API_KEY</span>, <span class="mono">GEMINI_API_KEY</span> y <span class="mono">RAPIDAPI_KEY</span> viven en un <span class="mono">.env</span> (600, no versionado); systemd lo carga con <span class="mono">EnvironmentFile</span> y <span class="mono">db.py</span> como respaldo. Cada proveedor de IA usa su propia clave.</li>
       <li><b>.gitignore</b> excluye <span class="mono">.venv/</span>, <span class="mono">jobs.db*</span>, <span class="mono">*.log</span> y <span class="mono">.env</span> (se versiona <span class="mono">.env.example</span>).</li>
-      <li><b>Render seguro.</b> Los resúmenes de Gemini pasan por un filtro Markdown que escapa HTML antes de mostrarse.</li>
+      <li><b>Render seguro.</b> Los resúmenes de la IA pasan por un filtro Markdown que escapa HTML antes de mostrarse.</li>
       <li><b>Solo lectura pública.</b> La app corre en la LAN; el timer recupera corridas perdidas con Persistent=true.</li>
     </ul>
   </section>
@@ -419,7 +424,7 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
 
   <footer>
     <span>JobHunter · mapa de arquitectura generado el 2026-07-22</span>
-    <span class="mono">Python · Flask · SQLite · systemd · Gemini</span>
+    <span class="mono">Python · Flask · SQLite · systemd · Claude/Gemini</span>
   </footer>
 
 </div></div>
@@ -427,14 +432,14 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
 <script id="archData" type="application/json">{
   "project": "JobHunter",
   "description": "Buscador personal de empleos remotos auto-alojado en una Raspberry Pi, con emparejamiento de CV por IA. Enfocado en DevOps/SRE remoto (contractor desde Colombia), ampliable a cualquier rol.",
-  "generated": "2026-07-21",
+  "generated": "2026-07-22",
   "host": "Raspberry Pi (Debian 13, Python 3.13) — http://192.168.1.11:8080",
-  "stack": ["Python 3.13", "Flask", "SQLite (WAL)", "systemd", "Gemini API"],
+  "stack": ["Python 3.13", "Flask", "SQLite (WAL)", "systemd", "Claude/Gemini API"],
   "metrics": {
     "sources": 11,
     "db_tables": 7,
-    "http_routes": 22,
-    "python_lines": 1720,
+    "http_routes": 24,
+    "python_lines": 2290,
     "template_files": 8,
     "systemd_units": 3,
     "ai_features": 2
@@ -518,16 +523,21 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
     },
     {
       "id": "ai",
-      "name": "IA (Gemini 2.5 Flash)",
+      "name": "IA · proveedor seleccionable (Claude / Gemini)",
       "color": "amber",
       "components": [
-        { "name": "reviews.py", "detail": "resumen de reputación de empresas con grounding de Google Search (Glassdoor)" },
+        { "name": "llm.py (router)", "detail": "capa única complete(parts, json_out, max_tokens, web_search) → enruta a Claude o Gemini según settings.ai_provider (por defecto claude; env AI_PROVIDER en runs manuales). Traduce parts estilo Gemini a bloques de Claude" },
+        { "name": "Claude (Anthropic)", "detail": "modelo claude-opus-4-8 (override ANTHROPIC_MODEL). Búsqueda web = herramienta de servidor web_search_20260209; maneja pause_turn. Sin thinking (más barato)" },
+        { "name": "Gemini (Google)", "detail": "gemini-2.5-flash; grounding tools:[{google_search}]; thinkingBudget=0 + maxOutputTokens holgado para no truncar" },
+        { "name": "reviews.py", "detail": "resumen de reputación de empresas con búsqueda web/grounding (Glassdoor); _parse() limpia citas de ambos proveedores" },
         { "name": "cv.py · analyze_cv", "detail": "extrae perfil del CV (PDF inline o texto): rol, seniority, años, skills, keywords" },
         { "name": "cv.py · match_jobs", "detail": "puntúa cada empleo 0–100 contra el perfil (badge y orden en Empleos)" },
         { "name": "cv.py · analyze_fit", "detail": "¿Encajo aquí? por oferta: coincidencias, gaps y qué resaltar" },
         { "name": "cv.py · cover_letter", "detail": "carta de presentación a medida por oferta" },
         { "name": "cv.py · improve_cv", "detail": "feedback estilo Harvard/ATS + resumen y logros reescritos" },
-        { "name": "GEMINI_API_KEY", "detail": "override de systemd (root, 600), fuera del repo; thinkingBudget=0" }
+        { "name": "cv.py · build_cv", "detail": "genera un CV NUEVO en JSON estructurado aplicando las recomendaciones; no inventa datos. Se cachea en profile.generated_cv" },
+        { "name": "cvpdf.py (fpdf2)", "detail": "renderiza el CV nuevo a PDF (DejaVu Sans para acentos); garantiza ≤2 páginas con doble pase. /cv/download lo sirve como adjunto" },
+        { "name": "ANTHROPIC_API_KEY / GEMINI_API_KEY", "detail": "cada proveedor su propia clave en .env (600, fuera del repo); si falta la del activo, degrada con mensaje" }
       ]
     }
   ],
@@ -537,11 +547,13 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
     "→ INSERT OR IGNORE en jobs + INSERT notificación si hay nuevos",
     "Flask lee jobs.db → renderiza Empleos/Compañías/Mi CV/Notificaciones",
     "Navegador sondea /api/jobs-status (45s) y /api/unread (30s) para avisar sin recargar",
-    "Compañías: botón → POST /companies/summary → reviews.py → Gemini (grounding) → company_reviews → HTML (AJAX)",
-    "Mi CV: subir CV → POST /cv/analyze → cv.py → Gemini → tabla profile",
-    "POST /cv/match → cv.py.match_jobs(perfil, jobs) → Gemini → tabla job_matches → Empleos ordenado por afinidad",
-    "Por oferta: /jobs/{id}/fit (¿encajo?) y /jobs/{id}/cover (carta) → cv.py → Gemini → AJAX",
-    "/cv/improve → mejora del CV (Harvard/ATS) → profile.feedback + profile.rewrite"
+    "Toda la IA pasa por llm.py, que enruta al proveedor activo (Claude por defecto, o Gemini) según settings.ai_provider",
+    "Compañías: botón → POST /companies/summary → reviews.py → llm.py → proveedor (búsqueda web/grounding) → company_reviews → HTML (AJAX)",
+    "Mi CV: subir CV → POST /cv/analyze → cv.py → llm.py → proveedor → tabla profile",
+    "POST /cv/match → cv.py.match_jobs(perfil, jobs) → llm.py → tabla job_matches → Empleos ordenado por afinidad",
+    "Por oferta: /jobs/{id}/fit (¿encajo?) y /jobs/{id}/cover (carta) → cv.py → llm.py → AJAX",
+    "/cv/improve → mejora del CV (Harvard/ATS) → profile.feedback + profile.rewrite",
+    "/cv/build → cv.build_cv → llm.py → CV nuevo (JSON) en profile.generated_cv; /cv/download → cvpdf.py → PDF ≤2 págs descargable"
   ],
   "db_schema": {
     "searches": ["id", "query", "title_keywords", "max_age_days", "active", "created_at"],
@@ -549,21 +561,23 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
     "notifications": ["id", "message", "created_at", "read"],
     "settings": ["key", "value"],
     "company_reviews": ["company", "summary", "resolved_name", "status", "generated_at"],
-    "profile": ["id (=1)", "cv_text", "role", "seniority", "years", "skills", "summary", "suggested_keywords", "feedback", "rewrite", "updated_at"],
+    "profile": ["id (=1)", "cv_text", "role", "seniority", "years", "skills", "summary", "suggested_keywords", "feedback", "rewrite", "generated_cv", "updated_at"],
     "job_matches": ["job_id→jobs", "score", "reason", "fit_detail", "updated_at"]
   },
   "routes": [
     { "path": "/", "method": "GET", "purpose": "Empleos: lista + filtros + % de afinidad + orden por afinidad" },
     { "path": "/run", "method": "POST", "purpose": "Buscar ahora (todas las activas o una)" },
     { "path": "/mark-seen", "method": "POST", "purpose": "Marca todos los empleos como vistos" },
-    { "path": "/searches", "method": "GET/POST", "purpose": "Búsquedas: alta, keywords de título, modo ubicación, ventana" },
+    { "path": "/searches", "method": "GET/POST", "purpose": "Búsquedas: alta, keywords de título, modo ubicación, ventana, proveedor de IA" },
     { "path": "/notifications", "method": "GET", "purpose": "Historial (marca leídas)" },
     { "path": "/companies", "method": "GET", "purpose": "Empleadores reales agregados del campo company" },
-    { "path": "/companies/summary", "method": "POST", "purpose": "Resumen de opiniones vía Gemini (JSON si AJAX)" },
+    { "path": "/companies/summary", "method": "POST", "purpose": "Resumen de opiniones vía IA (proveedor activo, JSON si AJAX)" },
     { "path": "/cv", "method": "GET", "purpose": "Mi CV: subir, perfil, afinidad, mejora" },
     { "path": "/cv/analyze", "method": "POST", "purpose": "Analiza el CV (PDF/texto) → perfil" },
     { "path": "/cv/match", "method": "POST", "purpose": "Puntúa todos los empleos contra el perfil" },
     { "path": "/cv/improve", "method": "POST", "purpose": "Mejora del CV (Harvard/ATS)" },
+    { "path": "/cv/build", "method": "POST", "purpose": "Genera un CV nuevo (JSON) aplicando las recomendaciones" },
+    { "path": "/cv/download", "method": "GET", "purpose": "Descarga el CV nuevo en PDF (≤2 páginas)" },
     { "path": "/cv/apply-keywords", "method": "POST", "purpose": "Aplica keywords sugeridas a la búsqueda activa" },
     { "path": "/jobs/<id>/fit", "method": "POST", "purpose": "¿Encajo aquí? — análisis oferta vs CV (AJAX)" },
     { "path": "/jobs/<id>/cover", "method": "POST", "purpose": "Carta de presentación a medida (AJAX)" },
@@ -579,34 +593,21 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
     { "file": "db.py", "role": "Esquema y helpers de SQLite (7 tablas)" },
     { "file": "fetcher.py", "role": "11 fuentes (10 públicas + LinkedIn RapidAPI), helper _rapidapi_get, filtros, orquestación" },
     { "file": "app.py", "role": "Servidor Flask, 22 rutas, filtro Markdown, favicon, mapas" },
-    { "file": "reviews.py", "role": "Resumen de opiniones de empresas vía Gemini + grounding" },
-    { "file": "cv.py", "role": "CV + IA: analizar, match, ¿encajo?, carta, mejora (Gemini)" },
+    { "file": "llm.py", "role": "Capa de proveedor de IA: enruta a Claude o Gemini según settings.ai_provider" },
+    { "file": "reviews.py", "role": "Resumen de opiniones de empresas vía IA (llm.py) + búsqueda web" },
+    { "file": "cv.py", "role": "CV + IA: analizar, match, ¿encajo?, carta, mejora, generar CV (llm.py)" },
+    { "file": "cvpdf.py", "role": "Renderiza el CV nuevo a PDF (fpdf2 + DejaVu, ≤2 páginas)" },
     { "file": "run_search.sh", "role": "Wrapper del cron con logging" },
     { "file": "templates/", "role": "8 vistas Jinja2" },
     { "file": "deploy/", "role": "Unidades systemd (referencia)" }
   ],
   "security": [
-    "Sin secretos en el repo: GEMINI_API_KEY y RAPIDAPI_KEY viven en .env (600, gitignored). systemd los carga con EnvironmentFile; db.py como fallback",
+    "Sin secretos en el repo: ANTHROPIC_API_KEY, GEMINI_API_KEY y RAPIDAPI_KEY viven en .env (600, gitignored). systemd los carga con EnvironmentFile; db.py como fallback",
     "El CV se guarda solo en la Pi (tablas profile/job_matches); 'Borrar perfil' lo elimina",
     ".gitignore excluye .venv/, jobs.db*, *.log, .env (se versiona .env.example)",
     "Filtro Markdown escapa HTML antes de renderizar resúmenes y análisis"
   ]
-}
-</script>
-<script>
-(function(){
-  try{
-    var raw = document.getElementById('archData').textContent;
-    var obj = JSON.parse(raw);
-    document.getElementById('jsonPre').textContent = JSON.stringify(obj, null, 2);
-  }catch(e){ document.getElementById('jsonPre').textContent = 'architecture.json'; }
-  // El botón va a /workflow cuando lo sirve la app; al artefacto publicado si no.
-  var btn = document.getElementById('wfbtn');
-  if(btn && /claude\.ai/.test(location.hostname)){
-    btn.href = 'https://claude.ai/code/artifact/164a4d45-d756-485b-a58f-7b4d668d0200';
-  }
-})();
-</script>
+}</script>
 
 </body>
 </html>

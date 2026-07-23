@@ -1,4 +1,4 @@
-"""Funciones de CV + IA con Gemini (Google AI Studio).
+"""Funciones de CV + IA con el proveedor activo (Claude o Gemini, ver llm.py).
 
 - analyze_cv: extrae rol, seniority, años, skills, resumen y keywords de título.
 - match_jobs: puntúa una lista de empleos contra el perfil (0-100 + razón).
@@ -6,63 +6,18 @@
 - improve_cv: feedback estilo Harvard/ATS + reescritura del resumen/logros.
 - cover_letter: carta de presentación a medida para una oferta.
 
-Requiere GEMINI_API_KEY (o GOOGLE_API_KEY). Nunca lanza excepción hacia el caller.
+El proveedor de IA se elige desde la UI (por defecto Claude). Nunca lanza
+excepción hacia el caller.
 """
-import os
-import re
 import json
 
-import requests
-
-MODEL = "gemini-2.5-flash"
-ENDPOINT = ("https://generativelanguage.googleapis.com/v1beta/models/"
-            "{model}:generateContent")
-TIMEOUT = 90
-
-
-def _key():
-    return os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+import llm
 
 
 def _gemini(parts, json_out=True, max_tokens=2048):
-    """Llama a Gemini. Devuelve (ok, data_or_error). parts: lista de 'parts'."""
-    key = _key()
-    if not key:
-        return False, "Falta GEMINI_API_KEY en el servicio (ver README)."
-    gen = {"temperature": 0.3, "maxOutputTokens": max_tokens,
-           "thinkingConfig": {"thinkingBudget": 0}}
-    if json_out:
-        gen["responseMimeType"] = "application/json"
-    payload = {"contents": [{"parts": parts}], "generationConfig": gen}
-    try:
-        r = requests.post(ENDPOINT.format(model=MODEL), params={"key": key},
-                          json=payload, timeout=TIMEOUT)
-    except requests.exceptions.RequestException as e:
-        return False, f"Error de red al consultar Gemini: {e}"
-    if r.status_code != 200:
-        try:
-            msg = r.json().get("error", {}).get("message", r.text[:200])
-        except Exception:
-            msg = r.text[:200]
-        return False, f"Error de la API de Gemini ({r.status_code}): {msg}"
-    try:
-        cand = (r.json().get("candidates") or [])[0]
-        txt = "".join(p.get("text", "") for p in cand.get("content", {}).get("parts", []))
-    except Exception:
-        return False, "Respuesta inesperada de Gemini."
-    if not json_out:
-        return True, txt.strip()
-    # Parseo robusto de JSON (por si llega envuelto en ```json ... ```).
-    try:
-        return True, json.loads(txt)
-    except json.JSONDecodeError:
-        m = re.search(r"[\[{].*[\]}]", txt, re.S)
-        if m:
-            try:
-                return True, json.loads(m.group(0))
-            except json.JSONDecodeError:
-                pass
-        return False, "Gemini no devolvió JSON válido."
+    """Genera una respuesta con el proveedor activo. Devuelve (ok, data_or_error).
+    Se conserva el nombre por compatibilidad; enruta a Claude o Gemini (llm.py)."""
+    return llm.complete(parts, json_out=json_out, max_tokens=max_tokens)
 
 
 def profile_blob(p):
@@ -191,6 +146,50 @@ def improve_cv(profile, cv_text=None):
         return {"ok": False, "error": data}
     return {"ok": True, "feedback": str(data.get("feedback", "")),
             "rewrite": str(data.get("rewrite", ""))}
+
+
+def build_cv(profile):
+    """Genera un CV nuevo, estructurado y optimizado (ATS/Harvard) a partir del CV
+    original + las recomendaciones ya calculadas. Devuelve {ok, cv} donde `cv` es
+    un dict con las secciones, o {ok:False, error}. No inventa datos: usa solo lo
+    que aparece en el CV/perfil; deja vacío u omite lo que no exista."""
+    p = profile or {}
+    fuentes = [f"PERFIL EXTRAÍDO:\n{profile_blob(p)}"]
+    if p.get("cv_text"):
+        fuentes.append("CV ORIGINAL (texto):\n" + str(p["cv_text"])[:16000])
+    if p.get("feedback"):
+        fuentes.append("RECOMENDACIONES (Harvard/ATS):\n" + str(p["feedback"])[:4000])
+    if p.get("rewrite"):
+        fuentes.append("RESUMEN Y LOGROS REESCRITOS:\n" + str(p["rewrite"])[:4000])
+
+    instr = (
+        "Eres un experto en CVs técnicos (estándar Harvard, compatible con ATS). "
+        "A partir de las FUENTES, redacta un CV NUEVO, aplicando las recomendaciones. "
+        "REGLAS ESTRICTAS:\n"
+        "- Usa SOLO información real presente en las fuentes. NO inventes empresas, "
+        "fechas, títulos ni datos de contacto. Si un dato no aparece, deja el campo "
+        "vacío (\"\") o la lista vacía; para contacto desconocido usa \"\".\n"
+        "- Cuantifica logros cuando la fuente lo permita; verbos de acción; conciso.\n"
+        "- Debe caber en 2 páginas: máx. 4 experiencias y máx. 5 viñetas por experiencia.\n"
+        "- En español.\n"
+        "Responde SOLO con este JSON (sin texto alrededor):\n"
+        '{"name":"nombre completo o \\"\\"", '
+        '"headline":"titular profesional, p. ej. \'DevOps Engineer | SRE\'", '
+        '"contact":{"email":"","phone":"","location":"","links":["url perfil/portafolio", "..."]}, '
+        '"summary":"resumen profesional de 2-3 frases", '
+        '"skills":["skill1","skill2", "..."], '
+        '"experience":[{"title":"","company":"","location":"","period":"","bullets":["logro cuantificado","..."]}], '
+        '"education":[{"degree":"","institution":"","period":""}], '
+        '"certifications":["..."], '
+        '"languages":["Español (nativo)","..."]}\n\n'
+        + "\n\n".join(fuentes)
+    )
+    ok, data = _gemini([{"text": instr}], json_out=True, max_tokens=4000)
+    if not ok:
+        return {"ok": False, "error": data}
+    if not isinstance(data, dict):
+        return {"ok": False, "error": "La IA no devolvió un CV estructurado."}
+    return {"ok": True, "cv": data}
 
 
 def cover_letter(profile, job):

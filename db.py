@@ -73,6 +73,7 @@ CREATE TABLE IF NOT EXISTS profile(
     suggested_keywords TEXT,
     feedback           TEXT,
     rewrite            TEXT,
+    generated_cv       TEXT,
     updated_at         TEXT DEFAULT (datetime('now','localtime'))
 );
 CREATE TABLE IF NOT EXISTS job_matches(
@@ -94,9 +95,25 @@ def get_db():
     return con
 
 
+# Columnas añadidas después de la creación inicial de una tabla. `CREATE TABLE
+# IF NOT EXISTS` no las agrega a una BD ya existente, así que las migramos aquí.
+_MIGRATIONS = {
+    "profile": {"generated_cv": "TEXT"},
+}
+
+
+def _migrate(con):
+    for table, cols in _MIGRATIONS.items():
+        existing = {r["name"] for r in con.execute(f"PRAGMA table_info({table})")}
+        for col, decl in cols.items():
+            if col not in existing:
+                con.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
+
+
 def init_db():
     con = get_db()
     con.executescript(SCHEMA)
+    _migrate(con)
     con.commit()
     con.close()
 

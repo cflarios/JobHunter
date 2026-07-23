@@ -58,6 +58,9 @@
     <form method="post" action="{{ url_for('cv_improve') }}" class="cv-form">
       <button class="btn" type="submit">↑ Mejorar mi CV (Harvard/ATS)</button>
     </form>
+    <form method="post" action="{{ url_for('cv_build') }}" class="cv-form">
+      <button class="btn" type="submit" title="Genera un CV nuevo aplicando las recomendaciones">⬇ Generar CV nuevo (PDF)</button>
+    </form>
   </div>
   {% if n_matches %}<p class="muted" style="font-size:12.5px;margin:10px 0 0">{{ n_matches }} empleo(s) con afinidad calculada — míralos ordenados en <a href="{{ url_for('index', sort='match') }}">Empleos</a>.</p>{% endif %}
 </div>
@@ -67,7 +70,24 @@
   <h3 style="margin-top:0">Mejora de CV con IA</h3>
   {% if profile.feedback %}<div style="margin-bottom:14px"><span class="muted" style="font-size:12px">RECOMENDACIONES (Harvard / ATS)</span>{{ profile.feedback|md }}</div>{% endif %}
   {% if profile.rewrite %}<div style="padding:12px 14px;background:var(--card2);border-radius:10px;border-left:3px solid var(--accent2)"><span class="muted" style="font-size:12px">RESUMEN Y LOGROS REESCRITOS</span>{{ profile.rewrite|md }}</div>{% endif %}
-  <div class="muted" style="font-size:11px;margin-top:10px">Generado por Gemini · edítalo a tu criterio</div>
+  <div class="muted" style="font-size:11px;margin-top:10px">Generado por {{ ai_label }} · edítalo a tu criterio</div>
+</div>
+{% endif %}
+
+{% if profile.generated_cv %}
+<div class="card" style="border-color:var(--accent2)">
+  <div class="row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+    <div>
+      <h3 style="margin:0 0 4px">Tu CV nuevo está listo</h3>
+      <p class="muted" style="margin:0;font-size:13px;max-width:60ch">CV reescrito por {{ ai_label }} aplicando las recomendaciones Harvard/ATS, en PDF (máx. 2 páginas). Revísalo y ajústalo a tu criterio antes de postular.</p>
+    </div>
+    <div class="row" style="gap:10px">
+      <a class="btn green" href="{{ url_for('cv_download') }}">⬇ Descargar PDF</a>
+      <form method="post" action="{{ url_for('cv_build') }}" class="cv-form">
+        <button class="btn ghost sm" type="submit" title="Vuelve a generarlo">↻ Regenerar</button>
+      </form>
+    </div>
+  </div>
 </div>
 {% endif %}
 {% endif %}

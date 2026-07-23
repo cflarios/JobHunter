@@ -26,11 +26,13 @@ replicamos **gratis** con Gemini (ver §7).
 
 ## 2. Estado actual (stack y acceso)
 
-- **Stack:** Python 3.13 · Flask · SQLite (WAL) · systemd · Gemini API · RapidAPI.
+- **Stack:** Python 3.13 · Flask · SQLite (WAL) · systemd · Claude/Gemini API · RapidAPI.
 - **Host:** Raspberry Pi (Debian 13). App en `http://192.168.1.11:8080` (LAN).
 - **Repo git:** local, rama `main`, en `/home/pi/project/job-hunter/`.
 - **Fuentes:** 11 bolsas de empleo.
-- **IA:** Gemini 2.5 Flash (resúmenes de empresas + CV/matching).
+- **IA:** proveedor **seleccionable** (Claude / Gemini) — por defecto **Claude Opus 4.8**
+  (Anthropic); Gemini 2.5 Flash como alternativa gratis. Cubre resúmenes de
+  empresas + CV/matching.
 - **Mapas visuales:** `/architecture` y `/workflow` (dentro de la app y como
   artefactos publicados). El botón "Ver como workflow" vive dentro de Arquitectura.
 
@@ -43,8 +45,10 @@ job-hunter/
 ├── app.py              # Servidor Flask: rutas, filtro Markdown, favicon, mapas
 ├── db.py               # Esquema SQLite (7 tablas) + carga de .env (fallback)
 ├── fetcher.py          # 11 fuentes, filtros (título/ubicación/fecha), orquestación
-├── reviews.py          # Resumen de reputación de empresas (Gemini + grounding)
-├── cv.py               # CV + IA: analizar, match, ¿encajo?, carta, mejorar (Gemini)
+├── llm.py              # Capa de proveedor de IA: enruta a Claude o Gemini (ai_provider)
+├── reviews.py          # Resumen de reputación de empresas (IA + búsqueda web/grounding)
+├── cv.py               # CV + IA: analizar, match, ¿encajo?, carta, mejorar, generar CV
+├── cvpdf.py            # Renderiza el CV nuevo a PDF (fpdf2 + DejaVu, ≤2 págs)
 ├── run_search.sh       # Wrapper del cron (→ fetcher.py, log en search.log)
 ├── templates/          # 8 vistas Jinja2 (base, index, searches, notifications,
 │                       #   companies, cv, _review, _fitblock)
@@ -143,23 +147,49 @@ Configurable desde la página **Búsquedas** (por búsqueda) y con ajustes globa
 
 ---
 
-## 7. IA con Gemini (gratis)
+## 7. IA con proveedor seleccionable (Claude / Gemini)
 
-**Modelo:** `gemini-2.5-flash`. **Gotcha crítico:** Gemini 2.5 gasta tokens de
-"thinking" que cuentan contra `maxOutputTokens` y **truncan** la salida
-(`finishReason: MAX_TOKENS`). Solución: `thinkingConfig.thinkingBudget = 0` +
-`maxOutputTokens` holgado. Para JSON fiable: `responseMimeType: application/json`.
+**Selector en la UI** (página Búsquedas → "Proveedor de IA"), guardado en
+`settings.ai_provider` (por defecto `claude`). Toda la IA pasa por **`llm.py`**,
+que expone `complete(parts, json_out=, max_tokens=, web_search=)` y enruta a:
+- **Claude** (`ANTHROPIC_API_KEY`, modelo `claude-opus-4-8`, override con
+  `ANTHROPIC_MODEL`). Búsqueda web = herramienta de servidor `web_search_20260209`;
+  se maneja `pause_turn` reenviando el turno. Sin `thinking` (más barato/rápido).
+- **Gemini** (`GEMINI_API_KEY`, `gemini-2.5-flash`). **Gotcha crítico:** Gemini 2.5
+  gasta tokens de "thinking" que truncan la salida (`finishReason: MAX_TOKENS`);
+  solución `thinkingConfig.thinkingBudget = 0` + `maxOutputTokens` holgado.
+  Grounding = `tools:[{google_search:{}}]`.
 
-- **`reviews.py`** — resumen de reputación de empresas (Glassdoor) con **grounding
-  de Google Search**. Glassdoor no tiene API pública gratis ni permite scraping,
+`llm.py` acepta `parts` estilo Gemini (`{"text"}` / `{"inline_data"}`) y los
+traduce a bloques de Claude (`document`/`image`). Devuelve `(ok, data_or_error)`;
+con `json_out` parsea el JSON de forma robusta (tolera ```json y texto alrededor).
+Puede forzarse el proveedor con la env `AI_PROVIDER` en runs manuales.
+
+- **`reviews.py`** — resumen de reputación de empresas (Glassdoor) con **búsqueda
+  web / grounding**. Glassdoor no tiene API pública gratis ni permite scraping,
   por eso se resume desde la web. Resuelve el nombre canónico para el enlace de
-  Glassdoor y cachea en `company_reviews`.
+  Glassdoor y cachea en `company_reviews`. `_parse()` limpia artefactos de cita de
+  ambos proveedores (`[cite:...]` de Gemini y `<cite index=...>` de Claude) y la
+  narración que Claude intercala antes del resumen (corta desde la línea `EMPRESA:`).
 - **`cv.py`** — funciones inspiradas en reaver.ink:
   - `analyze_cv` (PDF inline o texto) → perfil (rol, seniority, años, skills, keywords).
   - `match_jobs` → afinidad 0–100 por empleo (badge y orden en Empleos).
   - `analyze_fit` → "¿Encajo aquí?" por oferta (coincidencias, gaps, qué resaltar).
   - `cover_letter` → carta de presentación a medida.
   - `improve_cv` → feedback Harvard/ATS + reescritura.
+  - `build_cv` → **CV NUEVO** en JSON estructurado (name/headline/contact/summary/
+    skills/experience/education/certifications/languages) aplicando las
+    recomendaciones. **No inventa** datos: usa solo lo real del CV/perfil, deja
+    vacío lo que no exista. Se cachea en `profile.generated_cv`.
+- En subidas PDF, `app._pdf_text()` (pypdf) extrae el texto y lo guarda en
+  `profile.cv_text` (el análisis usa el PDF inline; el texto sirve para reconstruir).
+- **PDF del CV nuevo** (`cvpdf.py`, fpdf2 + DejaVu Sans para acentos): `render(cv)`
+  dibuja un layout compacto de una columna. **Garantiza ≤2 páginas** con doble pase
+  (si a escala 1.0 excede, reintenta a 0.86). `/cv/build` genera y cachea el JSON;
+  `/cv/download` lo renderiza y sirve como adjunto `CV_<nombre>.pdf`.
+- **Etiquetas de proveedor en la UI:** un `@app.context_processor` inyecta `ai_label`
+  a todas las plantillas, así los pies "Generado por…", "Análisis por…",
+  "Resumen por…" reflejan el proveedor **activo** (antes decían "Gemini" fijo).
 
 **Privacidad:** el CV se guarda **solo en la Pi** (`profile`/`job_matches`);
 "Borrar perfil" lo elimina.
@@ -175,7 +205,7 @@ Configurable desde la página **Búsquedas** (por búsqueda) y con ajustes globa
 | `notifications` | Avisos de hallazgos (read) |
 | `settings` | Config global (location_mode, max_age_days, last_run…) |
 | `company_reviews` | Caché de resúmenes de empresa + resolved_name |
-| `profile` | Perfil del CV (1 fila): role, skills, summary, suggested_keywords, feedback, rewrite |
+| `profile` | Perfil del CV (1 fila): cv_text, role, skills, summary, suggested_keywords, feedback, rewrite, generated_cv (JSON del CV nuevo) |
 | `job_matches` | Afinidad por empleo: score, reason, fit_detail |
 
 ---
@@ -185,7 +215,8 @@ Configurable desde la página **Búsquedas** (por búsqueda) y con ajustes globa
 Empleos `/` · Buscar ahora `/run` · Búsquedas `/searches` · Notificaciones
 `/notifications` · Compañías `/companies` (+ `/companies/summary`,
 `/companies/glassdoor-name`) · **Mi CV** `/cv` (+ `/cv/analyze`, `/cv/match`,
-`/cv/improve`, `/cv/apply-keywords`) · por oferta `/jobs/<id>/fit` y `/cover` ·
+`/cv/improve`, `/cv/apply-keywords`, `/cv/build`, `/cv/download`) · por oferta
+`/jobs/<id>/fit` y `/cover` ·
 mapas `/architecture` `/architecture.json` `/workflow` · polling `/api/unread`
 `/api/jobs-status`.
 
@@ -216,8 +247,10 @@ sudo systemctl restart jobhunter-web.service       # tras cambios en app/templat
 
 ## 11. Secretos y `.env`
 
-- Las claves (`GEMINI_API_KEY`, `RAPIDAPI_KEY`) viven **solo** en `.env`
-  (permisos 600, **gitignored**). `.env.example` es la plantilla versionada.
+- Las claves (`ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `RAPIDAPI_KEY`) viven **solo**
+  en `.env` (permisos 600, **gitignored**). `.env.example` es la plantilla
+  versionada. Cada proveedor de IA usa su propia clave; si falta la del proveedor
+  activo, la IA degrada con un mensaje que sugiere cambiar de proveedor.
 - Carga: systemd con `EnvironmentFile` **y** `db.py` como fallback (`setdefault`,
   no pisa variables ya definidas) para ejecuciones manuales.
 - **Si se mueve el proyecto de carpeta**, actualizar la ruta absoluta del
@@ -237,8 +270,9 @@ sudo systemctl restart jobhunter-web.service       # tras cambios en app/templat
   del feed completo de Jobicy.
 - **Ventana ≤ 3 días** es la del usuario; si un día no hay nada nuevo, es correcto
   (los feeds a veces publican con 4–6 días de retraso).
-- **Resúmenes/CV con Gemini** en vez de Anthropic — el usuario no tiene API key de
-  Anthropic; usa Google AI Studio (Gemini).
+- **IA con proveedor seleccionable, Claude por defecto** — el usuario ahora tiene
+  API key de Anthropic y prefiere Claude (Opus 4.8) para producción; Gemini queda
+  como alternativa gratis, elegible desde la UI sin tocar código.
 - **Paginación y ciertos spinners en cliente** — se pidió "frontend puro".
 - **Compañías y "¿Encajo?" por AJAX** — spinner garantizado y sin recargar; los
   botones de búsqueda usan spinner síncrono (`class="busy"`).
