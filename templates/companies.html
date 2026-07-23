@@ -28,7 +28,8 @@
       </div>
     </div>
     <div class="row">
-      <a class="btn sm gd-link" href="{{ c.glassdoor }}" target="_blank" rel="noopener">★ Ver en Glassdoor</a>
+      <a class="btn sm gd-link" href="{{ c.glassdoor }}" target="_blank" rel="noopener"
+         title="{{ 'Página de la empresa en Glassdoor' if c.glassdoor_direct else 'Buscar la empresa en Glassdoor' }}">★ {{ 'Ver en Glassdoor' if c.glassdoor_direct else 'Buscar en Glassdoor' }}</a>
       <form method="post" action="{{ url_for('company_summary') }}" class="gen-form">
         <input type="hidden" name="company" value="{{ c.name }}">
         <button class="btn sm green" type="submit">{{ '↻ Regenerar' if c.review else '✦ Resumen de opiniones' }}</button>
@@ -72,7 +73,11 @@ document.querySelectorAll('form.gen-form').forEach(function(form){
     }).then(function(r){ return r.json(); }).then(function(d){
       slot.innerHTML = d.html || '';
       var link = card.querySelector('.gd-link');
-      if(link && d.glassdoor) link.href = d.glassdoor;
+      if(link && d.glassdoor){
+        link.href = d.glassdoor;
+        link.textContent = '★ ' + (d.glassdoor_direct ? 'Ver en Glassdoor' : 'Buscar en Glassdoor');
+        link.title = d.glassdoor_direct ? 'Página de la empresa en Glassdoor' : 'Buscar la empresa en Glassdoor';
+      }
       var inp = card.querySelector('input[name=glassdoor_name]');
       if(inp && d.gd_name) inp.value = d.gd_name;
       btn.disabled = false;

@@ -83,8 +83,8 @@ def index():
              LEFT JOIN job_matches m ON m.job_id=j.id WHERE 1=1"""
     params = []
     if q:
-        sql += " AND (j.title LIKE ? OR j.company LIKE ?)"
-        params += [f"%{q}%", f"%{q}%"]
+        sql += " AND (j.title LIKE ? OR j.company LIKE ? OR j.skills LIKE ?)"
+        params += [f"%{q}%", f"%{q}%", f"%{q}%"]
     if source:
         sql += " AND j.source=?"
         params.append(source)
@@ -99,7 +99,15 @@ def index():
         sql += " ORDER BY (m.score IS NULL), m.score DESC, j.posted_ts DESC"
     else:
         sql += " ORDER BY j.posted_ts DESC, j.found_at DESC"
-    jobs = con.execute(sql, params).fetchall()
+    import skills as skl
+    jobs = []
+    for r in con.execute(sql, params).fetchall():
+        j = dict(r)
+        # Skills a mostrar: las guardadas o, si la fila es antigua/vacía, del título.
+        stored = (j.get("skills") or "").strip()
+        j["skill_list"] = ([s.strip() for s in stored.split(",") if s.strip()]
+                           if stored else skl.extract_skills(j["title"]))
+        jobs.append(j)
     has_profile = con.execute("SELECT 1 FROM profile WHERE id=1").fetchone() is not None
     n_matches = con.execute("SELECT COUNT(*) c FROM job_matches").fetchone()["c"]
 
@@ -254,6 +262,12 @@ def run_now():
     return redirect(request.referrer or url_for("index"))
 
 
+def _glassdoor_search(name):
+    """URL del buscador de Glassdoor (fallback cuando no hay página directa)."""
+    return ("https://www.glassdoor.com/Search/results.htm?keyword="
+            + quote_plus(name or ""))
+
+
 @app.route("/companies")
 def companies():
     con = get_db()
@@ -275,6 +289,7 @@ def companies():
         rev = reviews.get(r["company"])
         resolved = rev["resolved_name"] if rev and rev["resolved_name"] else None
         gd_name = resolved or r["company"]
+        gd_url = rev["glassdoor_url"] if rev and rev["glassdoor_url"] else None
         companies.append({
             "name": r["company"],
             "gd_name": gd_name,
@@ -282,8 +297,9 @@ def companies():
             "njobs": r["njobs"],
             "last_ts": r["last_ts"],
             "sources": (r["sources"] or "").split(","),
-            "glassdoor": "https://www.glassdoor.com/Search/results.htm?keyword="
-                         + quote_plus(gd_name),
+            # URL directa de la empresa si la IA la resolvió; si no, el buscador.
+            "glassdoor": gd_url or _glassdoor_search(gd_name),
+            "glassdoor_direct": bool(gd_url),
             "review": rev["summary"] if rev else None,
             "review_ok": (rev["status"] == "ok") if rev else None,
             "review_at": rev["generated_at"] if rev else None,
@@ -297,34 +313,39 @@ def company_summary():
     if company:
         con = get_db()
         existing = con.execute(
-            "SELECT resolved_name FROM company_reviews WHERE company=?", (company,)
-        ).fetchone()
+            "SELECT resolved_name, glassdoor_url FROM company_reviews WHERE company=?",
+            (company,)).fetchone()
         # Un nombre de Glassdoor ya fijado (manual o previo) manda la búsqueda.
         pinned = existing["resolved_name"] if existing and existing["resolved_name"] else None
+        old_url = existing["glassdoor_url"] if existing else None
         result = generate_company_summary(pinned or company)
         keep_resolved = pinned or result.get("resolved")
+        # Preferimos la URL directa nueva; si esta vez no la halló, conservamos la previa.
+        keep_url = result.get("url") or old_url
         con.execute(
-            "INSERT INTO company_reviews(company,summary,resolved_name,status,generated_at) "
-            "VALUES(?,?,?,?,datetime('now','localtime')) "
+            "INSERT INTO company_reviews(company,summary,resolved_name,glassdoor_url,status,generated_at) "
+            "VALUES(?,?,?,?,?,datetime('now','localtime')) "
             "ON CONFLICT(company) DO UPDATE SET "
             "summary=excluded.summary, resolved_name=excluded.resolved_name, "
-            "status=excluded.status, generated_at=excluded.generated_at",
-            (company, result["summary"], keep_resolved,
+            "glassdoor_url=excluded.glassdoor_url, status=excluded.status, "
+            "generated_at=excluded.generated_at",
+            (company, result["summary"], keep_resolved, keep_url,
              "ok" if result["ok"] else "error"))
         con.commit()
         con.close()
+        gd_name = keep_resolved or company
+        gd_link = keep_url or _glassdoor_search(gd_name)
         if request.headers.get("X-Requested-With") == "fetch":
             from types import SimpleNamespace
             c = SimpleNamespace(
                 review=result["summary"],
                 review_ok=result["ok"],
                 review_at=dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-            gd_name = keep_resolved or company
             return jsonify(
                 ok=result["ok"],
                 html=render_template("_review.html", c=c, expanded=True),
-                glassdoor="https://www.glassdoor.com/Search/results.htm?keyword="
-                          + quote_plus(gd_name),
+                glassdoor=gd_link,
+                glassdoor_direct=bool(keep_url),
                 gd_name=gd_name)
         flash(f"Resumen de «{company}» {'generado' if result['ok'] else 'no disponible'}.", "ok")
     return redirect(url_for("companies") + f"#c-{quote_plus(company)}")
@@ -336,9 +357,12 @@ def company_glassdoor_name():
     gd_name = request.form.get("glassdoor_name", "").strip() or None
     if company:
         con = get_db()
+        # Al fijar el nombre a mano, borramos la URL directa: puede no coincidir con
+        # el nuevo nombre. Volverá a resolverse al regenerar el resumen.
         con.execute(
-            "INSERT INTO company_reviews(company,resolved_name) VALUES(?,?) "
-            "ON CONFLICT(company) DO UPDATE SET resolved_name=excluded.resolved_name",
+            "INSERT INTO company_reviews(company,resolved_name,glassdoor_url) VALUES(?,?,NULL) "
+            "ON CONFLICT(company) DO UPDATE SET resolved_name=excluded.resolved_name, "
+            "glassdoor_url=NULL",
             (company, gd_name))
         con.commit()
         con.close()

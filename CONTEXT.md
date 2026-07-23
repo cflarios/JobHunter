@@ -45,6 +45,7 @@ job-hunter/
 ├── app.py              # Servidor Flask: rutas, filtro Markdown, favicon, mapas
 ├── db.py               # Esquema SQLite (8 tablas) + carga de .env (fallback)
 ├── fetcher.py          # 11 fuentes, filtros (título/ubicación/fecha), orquestación
+├── skills.py           # Extracción de skills técnicas del texto (diccionario curado)
 ├── llm.py              # Capa de proveedor de IA: enruta a Claude o Gemini (ai_provider)
 ├── reviews.py          # Resumen de reputación de empresas (IA + búsqueda web/grounding)
 ├── cv.py               # CV + IA: analizar, match, ¿encajo?, carta, mejorar, generar CV
@@ -155,6 +156,17 @@ Bloqueos) vía `app._back()`.
 
 Configurable desde la página **Búsquedas** (por búsqueda) y con ajustes globales.
 
+**Skills (`skills.py`, columna `jobs.skills`):** al ingerir, `extract_skills_str()`
+saca las skills técnicas del **`_text`** de cada fuente (título + descripción +
+tags/categorías) con un **diccionario curado** (matching por palabra completa,
+alias k8s→Kubernetes, etc.; evita falsos positivos como "go"/"rest"). Se guardan
+separadas por coma. En **Empleos** se muestran como **pills clicables** (llevan a
+`?q=<skill>`) y el buscador `q` también matchea la columna `skills` (título/empresa/
+skill). `db._backfill_skills()` rellena una vez las filas antiguas desde el título
+(NULL=sin procesar, ''=procesado sin skills); las skills ricas llegan con la próxima
+búsqueda. Fallback en la vista: si un empleo no tiene skills guardadas, se extraen
+del título al vuelo.
+
 ---
 
 ## 7. IA con proveedor seleccionable (Claude / Gemini)
@@ -177,10 +189,18 @@ Puede forzarse el proveedor con la env `AI_PROVIDER` en runs manuales.
 
 - **`reviews.py`** — resumen de reputación de empresas (Glassdoor) con **búsqueda
   web / grounding**. Glassdoor no tiene API pública gratis ni permite scraping,
-  por eso se resume desde la web. Resuelve el nombre canónico para el enlace de
-  Glassdoor y cachea en `company_reviews`. `_parse()` limpia artefactos de cita de
-  ambos proveedores (`[cite:...]` de Gemini y `<cite index=...>` de Claude) y la
-  narración que Claude intercala antes del resumen (corta desde la línea `EMPRESA:`).
+  por eso se resume desde la web. El prompt pide 3 líneas de cabecera:
+  `EMPRESA: <nombre canónico>`, `GLASSDOOR: <URL directa de la empresa>` y luego el
+  resumen. `_parse()` extrae ambas y limpia artefactos de cita de ambos proveedores
+  (`[cite:...]` de Gemini y `<cite index=...>` de Claude) + la narración que Claude
+  intercala (corta desde `EMPRESA:`). La **URL directa** (página Overview/Reviews de
+  la empresa) se **valida** con `_clean_glassdoor_url()` (debe ser glassdoor.com y
+  apuntar a página de empresa, no al buscador) y se cachea en
+  `company_reviews.glassdoor_url`. El botón **"Ver en Glassdoor"** usa esa URL
+  directa; si no hay, cae al **buscador** (`_glassdoor_search()`) y el botón dice
+  "Buscar en Glassdoor". Fijar el nombre a mano (`/companies/glassdoor-name`) **borra**
+  la URL (puede no coincidir); se re-resuelve al regenerar. Un regenerado que no
+  halle URL **conserva** la previa.
 - **`cv.py`** — funciones inspiradas en reaver.ink:
   - `analyze_cv` (PDF inline o texto) → perfil (rol, seniority, años, skills, keywords).
   - `match_jobs` → afinidad 0–100 por empleo (badge y orden en Empleos).
@@ -220,10 +240,10 @@ Puede forzarse el proveedor con la env `AI_PROVIDER` en runs manuales.
 |---|---|
 | `searches` | Búsquedas: query, title_keywords, max_age_days, active |
 | `blocked_companies` | Blacklist: empresas que no deben aparecer (name PRIMARY KEY COLLATE NOCASE) |
-| `jobs` | Empleos: title, company, url (unique), source, salary, location, posted_ts, is_new |
+| `jobs` | Empleos: title, company, url (unique), source, salary, location, posted_ts, skills, is_new |
 | `notifications` | Avisos de hallazgos (read) |
 | `settings` | Config global (location_mode, max_age_days, last_run…) |
-| `company_reviews` | Caché de resúmenes de empresa + resolved_name |
+| `company_reviews` | Caché de resúmenes de empresa + resolved_name + glassdoor_url (página directa) |
 | `profile` | Perfil del CV (1 fila): cv_text, role, skills, summary, suggested_keywords, feedback, rewrite, generated_cv (JSON del CV nuevo) |
 | `job_matches` | Afinidad por empleo: score, reason, fit_detail |
 

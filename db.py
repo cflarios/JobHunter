@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS jobs(
     location    TEXT,
     date_posted TEXT,
     posted_ts   INTEGER,
+    skills      TEXT,
     found_at    TEXT DEFAULT (datetime('now','localtime')),
     is_new      INTEGER NOT NULL DEFAULT 1
 );
@@ -63,6 +64,7 @@ CREATE TABLE IF NOT EXISTS company_reviews(
     company       TEXT PRIMARY KEY,
     summary       TEXT,
     resolved_name TEXT,
+    glassdoor_url TEXT,
     status        TEXT DEFAULT 'ok',
     generated_at  TEXT DEFAULT (datetime('now','localtime'))
 );
@@ -103,6 +105,8 @@ def get_db():
 # IF NOT EXISTS` no las agrega a una BD ya existente, así que las migramos aquí.
 _MIGRATIONS = {
     "profile": {"generated_cv": "TEXT"},
+    "company_reviews": {"glassdoor_url": "TEXT"},
+    "jobs": {"skills": "TEXT"},
 }
 
 
@@ -114,10 +118,23 @@ def _migrate(con):
                 con.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
 
 
+def _backfill_skills(con):
+    """Rellena jobs.skills en filas antiguas (NULL) extrayéndolas del título.
+    NULL = sin procesar; '' = procesado sin skills; así solo se hace una vez.
+    Las nuevas búsquedas guardan skills más ricas (del texto completo)."""
+    import skills as skl
+    rows = con.execute("SELECT id, title FROM jobs WHERE skills IS NULL").fetchall()
+    for r in rows:
+        con.execute("UPDATE jobs SET skills=? WHERE id=?",
+                    (skl.extract_skills_str(r["title"]), r["id"]))
+
+
 def init_db():
     con = get_db()
     con.executescript(SCHEMA)
     _migrate(con)
+    con.commit()
+    _backfill_skills(con)
     con.commit()
     con.close()
 

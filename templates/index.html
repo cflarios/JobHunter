@@ -20,7 +20,7 @@
 
 <div class="card">
   <form class="row" method="get">
-    <input type="text" name="q" value="{{ f_q }}" placeholder="Filtrar por título o empresa…" style="flex:1;min-width:180px">
+    <input type="text" name="q" value="{{ f_q }}" placeholder="Filtrar por título, empresa o skill…" style="flex:1;min-width:180px">
     <select name="search">
       <option value="">Todas las búsquedas</option>
       {% for s in searches %}
@@ -94,6 +94,13 @@
         <span class="pill">🗓 {{ j.date_posted or '—' }} ({{ j.posted_ts|ago }})</span>
         {% if j.squery %}<span class="pill">🔎 {{ j.squery }}</span>{% endif %}
       </div>
+      {% if j.skill_list %}
+      <div class="row" style="margin-top:8px;gap:6px">
+        {% for sk in j.skill_list %}
+        <a class="pill skill-pill" href="{{ url_for('index', q=sk) }}" title="Filtrar empleos con {{ sk }}">{{ sk }}</a>
+        {% endfor %}
+      </div>
+      {% endif %}
       {% if j.match_reason %}<div class="muted" style="font-size:12.5px;margin-top:6px">✦ {{ j.match_reason }}</div>{% endif %}
     </div>
     <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;min-width:120px">

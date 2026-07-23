@@ -31,7 +31,13 @@ def _prompt(company):
         f"nombre tal cual.\n\n"
         f"FORMATO DE RESPUESTA (respétalo al pie de la letra):\n"
         f"- La PRIMERA línea debe ser exactamente: EMPRESA: <nombre completo canónico>\n"
-        f"- A partir de la segunda línea, el resumen en Markdown, empezando "
+        f"- La SEGUNDA línea debe ser exactamente: GLASSDOOR: <URL directa de la "
+        f"página de ESTA empresa en Glassdoor (la de Overview o Reviews, con su "
+        f"employer id, p. ej. https://www.glassdoor.com/Overview/Working-at-...-EI_IE12345.11,20.htm), "
+        f"tomada de los resultados de búsqueda>. Usa SOLO una URL real que hayas "
+        f"visto en los resultados; NO inventes el id ni la URL. Si no la tienes con "
+        f"seguridad, escribe exactamente: GLASSDOOR: none\n"
+        f"- A partir de la tercera línea, el resumen en Markdown, empezando "
         f"DIRECTAMENTE con la viñeta «- **Glassdoor:**». NADA antes.\n\n"
         f"Estructura del resumen:\n"
         f"- **Glassdoor:** calificación X/5 y nº aproximado de reseñas (si la encuentras).\n"
@@ -47,8 +53,23 @@ def _prompt(company):
     )
 
 
+def _clean_glassdoor_url(cand):
+    """Valida la URL de Glassdoor devuelta por la IA. Solo acepta una URL real de
+    página de empresa (Overview/Reviews con employer id); si no, devuelve None."""
+    if not cand:
+        return None
+    cand = cand.strip().strip("<>()[]").rstrip(".,;")
+    low = cand.lower()
+    if not low.startswith(("http://", "https://")) or "glassdoor.com" not in low:
+        return None
+    # Debe apuntar a una página de empresa, no al buscador ni a la home.
+    if not re.search(r"/(overview|reviews|working-at|ei_ie|-e\d)", low):
+        return None
+    return cand
+
+
 def _parse(text):
-    """Extrae el nombre resuelto (línea EMPRESA:) y limpia el preámbulo.
+    """Extrae (resolved_name, glassdoor_url, summary) de la respuesta y limpia.
 
     Tolera artefactos de grounding de ambos proveedores: marcadores `[cite: 3]`
     de Gemini y etiquetas `<cite index="...">…</cite>` de Claude, además de la
@@ -66,6 +87,13 @@ def _parse(text):
         resolved = m.group(1).splitlines()[0].strip() or None
         text = text[m.end():]
 
+    # Línea GLASSDOOR: <url> — la extraemos, validamos y la quitamos del texto.
+    url = None
+    mu = re.search(r"(?im)^\s*GLASSDOOR:\s*(\S+)", text)
+    if mu:
+        url = _clean_glassdoor_url(mu.group(1))
+        text = re.sub(r"(?im)^\s*GLASSDOOR:.*$", "", text, count=1)
+
     lines = text.strip().splitlines()
     # Descartar líneas en blanco iniciales.
     while lines and not lines[0].strip():
@@ -75,22 +103,23 @@ def _parse(text):
         first = lines[0].lstrip()
         if not first.startswith(("-", "*", "#", ">", "**")) and _PREAMBLE_RE.match(first):
             lines.pop(0)
-    return resolved, "\n".join(lines).strip()
+    return resolved, url, "\n".join(lines).strip()
 
 
 def generate_company_summary(company):
-    """Devuelve dict {ok, summary, resolved}. Nunca lanza excepción."""
+    """Devuelve dict {ok, summary, resolved, url}. Nunca lanza excepción."""
     ok, data = llm.complete([{"text": _prompt(company)}], json_out=False,
                             max_tokens=2048, web_search=True)
     if not ok:
-        return {"ok": False, "resolved": None,
+        return {"ok": False, "resolved": None, "url": None,
                 "summary": (data + "\n\nMientras tanto, usa el botón "
                             "**Ver en Glassdoor**.")}
     raw = (data or "").strip()
     if not raw:
-        return {"ok": False, "resolved": None, "summary": "El modelo no devolvió texto."}
-    resolved, summary = _parse(raw)
-    return {"ok": True, "resolved": resolved, "summary": summary or raw}
+        return {"ok": False, "resolved": None, "url": None,
+                "summary": "El modelo no devolvió texto."}
+    resolved, url, summary = _parse(raw)
+    return {"ok": True, "resolved": resolved, "url": url, "summary": summary or raw}
 
 
 if __name__ == "__main__":

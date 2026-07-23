@@ -19,6 +19,7 @@ from xml.etree import ElementTree as ET
 import requests
 
 from db import get_db, get_setting
+from skills import extract_skills_str
 
 UA = "Mozilla/5.0 (JobHunter/1.0; +personal-job-search)"
 HEADERS = {"User-Agent": UA, "Accept": "application/json"}
@@ -760,14 +761,16 @@ def run_search(con, query, max_age_days=MAX_AGE_DAYS_DEFAULT,
 
     inserted = 0
     for j in filtered:
+        # Skills desde el texto completo (título + descripción + tags de la fuente).
+        skills = extract_skills_str(j.get("_text") or j.get("title", ""))
         cur = con.execute(
             """INSERT OR IGNORE INTO jobs
                (search_id,title,company,url,source,salary,location,
-                date_posted,posted_ts,is_new)
-               VALUES(?,?,?,?,?,?,?,?,?,1)""",
+                date_posted,posted_ts,skills,is_new)
+               VALUES(?,?,?,?,?,?,?,?,?,?,1)""",
             (search_id, _clean(j["title"]), _clean(j.get("company")), j["url"],
              j["source"], j.get("salary", ""), _clean(j.get("location")),
-             _fmt_date(j.get("posted_ts")), j.get("posted_ts")),
+             _fmt_date(j.get("posted_ts")), j.get("posted_ts"), skills),
         )
         if cur.rowcount:
             inserted += 1
