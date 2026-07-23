@@ -337,6 +337,13 @@ Empleos `/` · Buscar ahora `/run` · Búsquedas `/searches` · **Configuración
 Notificaciones `/notifications` · Compañías `/companies` (+ `/companies/summary`,
 `/companies/glassdoor-name`, `/companies/block`, `/companies/unblock`) ·
 **Bloqueos** `/blacklist` (blacklist de compañías, alta manual) ·
+En **Compañías**, la píldora «📋 N oferta(s)» es un **botón** que despliega, en la
+propia tarjeta, las vacantes de esa empresa (título enlazado a la **postulación
+real**, salario, ubicación, fecha, fuente, badge NUEVO y % de afinidad) más un
+enlace «Ver estas ofertas en Empleos» (`/?q=<empresa>`). Las ofertas se
+**pre-renderizan** en `companies()` (`jobs_by_company`, agrupadas por
+`company.strip().lower()`): son pocas decenas, así que abrir es instantáneo y sin
+AJAX. Evita tener que ir a Empleos a buscarlas a mano.
 **Mi CV** `/cv` (+ `/cv/analyze`, `/cv/match`, `/cv/improve`, `/cv/apply-keywords`,
 `/cv/build`, `/cv/download?lang=`) · por oferta `/jobs/<id>/fit`, `/cover`,
 **`/tailor`** (CV a medida ATS, AJAX) y **`/cv.pdf`** (descarga ese CV) ·

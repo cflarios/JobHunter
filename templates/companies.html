@@ -2,6 +2,36 @@
 {% block title %}Compañías · JobHunter{% endblock %}
 {% block body %}
 
+<style>
+/* La píldora de ofertas es un botón: despliega las vacantes de esa empresa */
+.jobs-toggle{cursor:pointer;font-family:inherit;border:1px solid transparent;
+  display:inline-flex;align-items:center;gap:6px;transition:color .14s,border-color .14s}
+.jobs-toggle:hover{color:var(--accent);border-color:var(--accent)}
+.jobs-toggle .chev{font-size:10px;transition:transform .18s}
+.jobs-toggle[aria-expanded="true"]{color:var(--accent);border-color:var(--accent)}
+.jobs-toggle[aria-expanded="true"] .chev{transform:rotate(180deg)}
+.jobs-panel{margin-top:6px;background:var(--card2);border-radius:10px;
+  border-left:3px solid var(--accent);overflow:hidden}
+.joblink{display:grid;grid-template-columns:1fr auto;gap:2px 12px;align-items:center;
+  padding:10px 14px;border-bottom:1px solid var(--line);text-decoration:none;color:inherit;
+  transition:background .14s}
+.joblink:last-of-type{border-bottom:none}
+.joblink:hover{background:rgba(79,140,255,.09)}
+.jl-main{grid-column:1;font-size:14px;font-weight:600;color:var(--txt);line-height:1.35}
+.joblink:hover .jl-title{color:var(--accent)}
+.jl-meta{grid-column:1;font-size:12px;color:var(--mut)}
+.jl-go{grid-row:1 / span 2;grid-column:2;font-size:12px;font-weight:600;color:var(--accent);
+  white-space:nowrap;opacity:.75}
+.joblink:hover .jl-go{opacity:1}
+.jl-all{display:block;padding:9px 14px;font-size:12.5px;color:var(--mut);
+  border-top:1px solid var(--line);text-decoration:none}
+.jl-all:hover{color:var(--accent);background:rgba(79,140,255,.06)}
+@media(max-width:560px){
+  .joblink{grid-template-columns:1fr}
+  .jl-go{grid-row:auto;grid-column:1;opacity:1;margin-top:2px}
+}
+</style>
+
 <div class="row" style="justify-content:space-between;margin-bottom:14px">
   <h2 style="margin:0">Compañías que han publicado</h2>
   <span class="muted">{{ companies|length }} empresa(s)</span>
@@ -22,7 +52,8 @@
         <button class="btn sm ghost" type="submit">Guardar nombre</button>
       </form>
       <div class="row" style="margin:8px 0">
-        <span class="pill">📋 {{ c.njobs }} oferta(s)</span>
+        <button type="button" class="pill jobs-toggle" aria-expanded="false"
+                title="Ver las ofertas de {{ c.name }}">📋 {{ c.njobs }} oferta(s)<span class="chev">▾</span></button>
         <span class="pill">🗓 {{ c.last_ts|ago }}</span>
         {% for s in c.sources %}<span class="pill">📍 {{ s }}</span>{% endfor %}
       </div>
@@ -43,6 +74,30 @@
     </div>
   </div>
 
+  <div class="jobs-panel" hidden>
+    {% for j in c.jobs %}
+    <a class="joblink" href="{{ j.url }}" target="_blank" rel="noopener"
+       title="Abrir la oferta en {{ j.source }}">
+      <span class="jl-main">
+        <span class="jl-title">{{ j.title }}</span>
+        {% if j.is_new %}<span class="badge" style="margin-left:6px">NUEVO</span>{% endif %}
+        {% if j.match_score is not none %}
+          {% set mc = 'var(--accent2)' if j.match_score>=80 else ('var(--accent)' if j.match_score>=60 else 'var(--warn)') %}
+          <span class="pill" style="color:{{ mc }};border-color:{{ mc }};font-weight:700;margin-left:6px">✦ {{ j.match_score }}%</span>
+        {% endif %}
+      </span>
+      <span class="jl-meta">
+        {% if j.salary %}💰 {{ j.salary }} · {% endif %}📍 {{ j.location or 'Remote' }} ·
+        🗓 {{ j.posted_ts|ago }} · 🌐 {{ j.source }}
+      </span>
+      <span class="jl-go">Postular ↗</span>
+    </a>
+    {% else %}
+    <div class="muted" style="padding:10px 12px;font-size:13px">Sin ofertas guardadas.</div>
+    {% endfor %}
+    <a class="jl-all" href="{{ url_for('index', q=c.name) }}">Ver estas ofertas en Empleos (con «¿encajo?», carta y CV a medida) →</a>
+  </div>
+
   <div class="review-slot">
     {% if c.review %}{% include '_review.html' %}{% endif %}
   </div>
@@ -56,6 +111,17 @@
 <script>
 jhPaginate(document.getElementById('companies-list'), '.company-card', 10,
            document.getElementById('companies-pager'));
+
+// Desplegar/plegar las ofertas de una empresa (ya vienen renderizadas: instantáneo)
+document.querySelectorAll('.jobs-toggle').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var panel = btn.closest('.company-card').querySelector('.jobs-panel');
+    if(!panel) return;
+    var open = btn.getAttribute('aria-expanded') === 'true';
+    btn.setAttribute('aria-expanded', open ? 'false' : 'true');
+    panel.hidden = open;
+  });
+});
 document.querySelectorAll('form.gen-form').forEach(function(form){
   form.addEventListener('submit', function(e){
     e.preventDefault();

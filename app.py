@@ -376,6 +376,18 @@ def companies():
     """).fetchall()
     reviews = {r["company"]: r for r in
                con.execute("SELECT * FROM company_reviews").fetchall()}
+    # Ofertas de cada empresa, para poder desplegarlas en la propia tarjeta sin
+    # tener que ir a Empleos a buscarlas. Son pocas: se pre-renderizan.
+    jobs_by_company = {}
+    for r in con.execute("""
+        SELECT j.id, j.company, j.title, j.url, j.salary, j.location, j.source,
+               j.date_posted, j.posted_ts, j.is_new, m.score AS match_score
+        FROM jobs j
+        LEFT JOIN job_matches m ON m.job_id = j.id
+        WHERE j.company IS NOT NULL AND TRIM(j.company) <> ''
+        ORDER BY j.posted_ts DESC, j.id DESC
+    """).fetchall():
+        jobs_by_company.setdefault(r["company"].strip().lower(), []).append(dict(r))
     con.close()
     companies = []
     for r in rows:
@@ -396,6 +408,7 @@ def companies():
             "review": rev["summary"] if rev else None,
             "review_ok": (rev["status"] == "ok") if rev else None,
             "review_at": rev["generated_at"] if rev else None,
+            "jobs": jobs_by_company.get(r["company"].strip().lower(), []),
         })
     return render_template("companies.html", companies=companies)
 

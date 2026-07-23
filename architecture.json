@@ -184,7 +184,7 @@
         },
         {
           "name": "Compañías",
-          "detail": "empleadores reales + Glassdoor + resumen AJAX con spinner"
+          "detail": "empleadores reales + Glassdoor + resumen AJAX con spinner; la píldora de ofertas despliega las vacantes de esa empresa con enlace directo a la postulación"
         },
         {
           "name": "Mi CV",
