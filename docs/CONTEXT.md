@@ -422,6 +422,15 @@ oferta a partir de los eventos).
   ignorar una candidatura que nunca enviaste), retirada ⇒ `interesado`. Se hace en
   **lectura**, no escribiendo eventos falsos en el historial, y con `max()` para no
   pisar un recorrido más avanzado ya registrado.
+- **`_reached()` REPRODUCE el historial, no hace un máximo ciego.** Segundo bug de
+  uso: si marcabas «aceptada» por error y lo devolvías a «entrevista técnica», el
+  embudo seguía mostrando una oferta aceptada, porque se tomaba el máximo de todo
+  el historial. Ahora se recorren los eventos **en orden**: un evento de *etapa*
+  fija la posición (**el último manda**, así que retroceder corrige de verdad — en
+  un proceso real no se retrocede, si retrocedes es que te equivocaste) y un
+  *desenlace* solo puede **subir** hasta su `IMPLIED_MIN`, nunca bajar lo recorrido.
+  Cubierto por 9 casos de regresión (avance con rechazo tardío, corrección hacia
+  atrás, desenlaces en seco, reapertura tras rechazo…).
 - **Los desenlaces van todos en la ÚLTIMA columna** del Sankey. Colocarlos justo
   detrás de la etapa de la que caen los dejaba mezclados con una etapa activa en la
   misma columna (p. ej. «Rechazado» junto a «Contacto RR. HH.») y no se distinguía

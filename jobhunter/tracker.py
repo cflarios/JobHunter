@@ -155,25 +155,42 @@ IMPLIED_MIN = {
 
 
 def _reached(con):
-    """Etapa MÁXIMA alcanzada por cada postulación.
+    """Etapa alcanzada por cada postulación, **reproduciendo** su historial.
 
-    Se mira el historial y no solo el estado actual: una postulación rechazada tras
-    la entrevista técnica sí «alcanzó» la técnica, y así debe contar en el embudo.
-    A eso se le suma la etapa mínima que implica el desenlace (ver IMPLIED_MIN), de
-    modo que un «rechazado» marcado a pelo cuente igualmente como postulación.
+    No vale con quedarse con el estado actual: una postulación rechazada tras la
+    entrevista técnica sí «alcanzó» la técnica y debe contar como tal en el embudo.
+    Pero tampoco vale un máximo ciego sobre todo el historial, porque entonces
+    **corregir un error no tendría efecto**: si marcas «aceptada» por equivocación y
+    lo devuelves a «entrevista técnica», el embudo seguiría enseñando una oferta
+    aceptada para siempre.
+
+    Por eso se recorren los eventos **en orden** con dos reglas:
+      · un evento de ETAPA fija la posición — el último manda, así que un cambio
+        hacia atrás corrige de verdad (en un proceso real no se retrocede: si
+        retrocedes es que te equivocaste);
+      · un DESENLACE solo puede *subir* hasta el mínimo que implica (IMPLIED_MIN),
+        nunca bajar lo ya recorrido.
     """
-    reached = {}
-
-    def bump(job_id, i):
-        if i is not None:
-            reached[job_id] = max(reached.get(job_id, -1), i)
-
+    hist = {}
     for r in con.execute("SELECT job_id, to_status FROM application_events ORDER BY id"):
-        bump(r["job_id"], stage_index(r["to_status"]))
-        bump(r["job_id"], stage_index(IMPLIED_MIN.get(r["to_status"], "")))
+        hist.setdefault(r["job_id"], []).append(r["to_status"])
+    # Filas sin historial (datos anteriores a los eventos): sirve el estado actual.
     for r in con.execute("SELECT job_id, status FROM applications"):
-        bump(r["job_id"], stage_index(r["status"]))
-        bump(r["job_id"], stage_index(IMPLIED_MIN.get(r["status"], "")))
+        hist.setdefault(r["job_id"], [r["status"]])
+
+    reached = {}
+    for job_id, steps in hist.items():
+        top = -1
+        for st in steps:
+            i = stage_index(st)
+            if i is not None:
+                top = i                      # la última etapa marcada manda
+            else:
+                j = stage_index(IMPLIED_MIN.get(st, ""))
+                if j is not None:
+                    top = max(top, j)        # un desenlace solo sube el mínimo
+        if top >= 0:
+            reached[job_id] = top
     return reached
 
 
