@@ -11,10 +11,9 @@ BD, se usa la variable de entorno correspondiente.
 """
 import os
 
-from db import get_db, get_setting, set_setting
+from jobhunter.db import get_db, get_setting, set_setting
 
-_DIR = os.path.dirname(os.path.abspath(__file__))
-_KEY_FILE = os.path.join(_DIR, "secret.key")
+from jobhunter.paths import SECRET_KEY_FILE as _KEY_FILE
 
 _SETTING = {"anthropic": "apikey_anthropic", "gemini": "apikey_gemini"}
 _ENV = {"anthropic": ("ANTHROPIC_API_KEY",),

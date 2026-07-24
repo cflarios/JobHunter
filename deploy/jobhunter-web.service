@@ -7,7 +7,7 @@ Wants=network-online.target
 Type=simple
 User=pi
 WorkingDirectory=/home/pi/project/job-hunter
-ExecStart=/home/pi/project/job-hunter/.venv/bin/python /home/pi/project/job-hunter/app.py
+ExecStart=/home/pi/project/job-hunter/.venv/bin/python /home/pi/project/job-hunter/run.py
 Restart=on-failure
 RestartSec=5
 

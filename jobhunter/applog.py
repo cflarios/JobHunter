@@ -9,7 +9,7 @@ Formato pensado para parsearse fácil en la consola de la UI:
     2026-07-23 18:04:11 | INFO    | search    | «DevOps Engineer» (≤3d): 20 vistos, 1 nuevos
 
 Uso:
-    import applog
+    from jobhunter import applog
     log = applog.get("search")      # web | search | sched | notify | ai | cv
     log.info("…")
 """
@@ -17,9 +17,7 @@ import logging
 import os
 from logging.handlers import RotatingFileHandler
 
-_DIR = os.path.dirname(os.path.abspath(__file__))
-LOG_DIR = os.path.join(_DIR, "logs")
-LOG_FILE = os.path.join(LOG_DIR, "jobhunter.log")
+from jobhunter.paths import APP_LOG as LOG_FILE, LOG_DIR, ensure_dirs
 
 SEP = " | "
 FMT = "%(asctime)s" + SEP + "%(levelname)-7s" + SEP + "%(name)-9s" + SEP + "%(message)s"
@@ -35,7 +33,7 @@ def setup(stream=True, level=logging.INFO):
     global _ready
     if _ready:
         return
-    os.makedirs(LOG_DIR, exist_ok=True)
+    ensure_dirs()
     root = logging.getLogger("jh")
     root.setLevel(level)
     root.propagate = False

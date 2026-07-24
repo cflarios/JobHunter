@@ -1,15 +1,14 @@
 import os
 import sqlite3
 
-_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(_DIR, "jobs.db")
+from jobhunter.paths import DB_PATH, ENV_FILE, ensure_dirs
 
 
 def _load_dotenv():
     """Carga el .env del proyecto (KEY=value) sin pisar variables ya definidas.
     Respaldo para ejecuciones manuales; en producción systemd usa EnvironmentFile."""
     try:
-        with open(os.path.join(_DIR, ".env"), encoding="utf-8") as f:
+        with open(ENV_FILE, encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
                 if not line or line.startswith("#") or "=" not in line:
@@ -103,6 +102,7 @@ CREATE INDEX IF NOT EXISTS idx_jobs_posted ON jobs(posted_ts DESC);
 
 
 def get_db():
+    ensure_dirs()          # data/ puede no existir en un clon recién hecho
     con = sqlite3.connect(DB_PATH, timeout=15)
     con.row_factory = sqlite3.Row
     con.execute("PRAGMA journal_mode=WAL")
@@ -131,7 +131,7 @@ def _backfill_skills(con):
     """Rellena jobs.skills en filas antiguas (NULL) extrayéndolas del título.
     NULL = sin procesar; '' = procesado sin skills; así solo se hace una vez.
     Las nuevas búsquedas guardan skills más ricas (del texto completo)."""
-    import skills as skl
+    from jobhunter import skills as skl
     rows = con.execute("SELECT id, title FROM jobs WHERE skills IS NULL").fetchall()
     for r in rows:
         con.execute("UPDATE jobs SET skills=? WHERE id=?",

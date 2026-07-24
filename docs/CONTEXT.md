@@ -42,29 +42,46 @@ replicamos **gratis** con Gemini (ver §7).
 
 ```
 job-hunter/
-├── app.py              # Servidor Flask: rutas, filtro Markdown, favicon, mapas
-├── db.py               # Esquema SQLite (9 tablas) + carga de .env (fallback)
-├── fetcher.py          # 11 fuentes, filtros (título/ubicación/fecha), orquestación
-├── skills.py           # Extracción de skills técnicas del texto (diccionario curado)
-├── llm.py              # Capa de proveedor de IA: enruta a Claude o Gemini (ai_provider)
-├── applog.py           # Log central rotativo (logs/jobhunter.log) + lectura para la UI
-├── notifier.py         # Notificaciones de empleos nuevos (email SMTP + HTML estético)
-├── reviews.py          # Resumen de reputación de empresas (IA + búsqueda web/grounding)
-├── cv.py               # CV + IA: analizar, match, ¿encajo?, carta, mejorar, generar CV,
-│                       #   CV a medida por vacante (ATS) + blindaje anti-alucinación
-├── cvpdf.py            # Renderiza el CV nuevo a PDF (fpdf2 + DejaVu, ≤2 págs)
-├── run_search.sh       # Wrapper del cron (→ fetcher.py, log en search.log)
-├── templates/          # 12 vistas Jinja2 (base, index, searches, settings, blacklist, logs,
-│                       #   notifications, companies, cv, _review, _fitblock, _tailorblock)
+├── jobhunter/          # PAQUETE de la aplicación (todo el código)
+│   ├── __init__.py
+│   ├── paths.py        # Rutas del proyecto en un solo sitio (ROOT, data/, docs/)
+│   ├── app.py          # Servidor Flask: rutas, filtros Jinja, planificador
+│   ├── db.py           # Esquema SQLite (9 tablas) + carga de .env (fallback)
+│   ├── fetcher.py      # 12 fuentes, filtros (título/ubicación/fecha), orquestación
+│   ├── skills.py       # Extracción de skills técnicas del texto (diccionario curado)
+│   ├── llm.py          # Capa de proveedor de IA: enruta a Claude o Gemini
+│   ├── applog.py       # Log central rotativo + lectura/parseo para la UI
+│   ├── notifier.py     # Notificaciones multi-canal (email SMTP + Telegram)
+│   ├── reviews.py      # Resumen de reputación de empresas (IA + búsqueda web)
+│   ├── cv.py           # CV + IA: perfil, match, ¿encajo?, carta, CV nuevo,
+│   │                   #   CV a medida por vacante (ATS) + blindaje anti-alucinación
+│   ├── cvpdf.py        # Renderiza los CVs a PDF (fpdf2 + DejaVu, ≤2 págs)
+│   ├── templates/      # 12 vistas Jinja2
+│   └── static/
+├── data/               # RUNTIME, gitignored: jobs.db, secret.key, logs/, search.log
+├── docs/               # CONTEXT.md + mapas (architecture.json/html, workflow.html)
 ├── deploy/             # Copia de referencia de las unidades systemd (sin secretos)
-├── architecture.json   # Modelo estructurado del sistema (fuente de verdad)
-├── architecture.html   # Mapa visual autocontenido (embebe el JSON)
-├── workflow.html       # Workflow interactivo tipo n8n (nodos + aristas)
+├── scripts/run_search.sh   # Wrapper para corridas manuales (→ data/search.log)
+├── run.py              # Punto de entrada: from jobhunter.app import main
+├── requirements.txt
 ├── .env                # SECRETOS (gitignored, 600) — no se versiona
 ├── .env.example        # Plantilla versionada
-├── README.md           # Operativo
-└── CONTEXT.md          # Este documento
+└── README.md           # Operativo
 ```
+
+**Estándar de layout (2026-07-23).** Antes los 12 módulos, los datos, los mapas y
+los docs convivían sueltos en la raíz. Ahora: **el código va en el paquete
+`jobhunter/`**, lo generado en runtime en **`data/`** y la documentación en
+**`docs/`**. Reglas que lo sostienen:
+- **Los imports internos son absolutos** (`from jobhunter.db import get_db`), no
+  planos. Funcionan igual con `python run.py` que con `python -m jobhunter.fetcher`.
+- **Ninguna ruta se recalcula con `__file__`** fuera de `jobhunter/paths.py`: ahí
+  se define `ROOT`, `DATA_DIR`, `DB_PATH`, `SECRET_KEY_FILE`, `APP_LOG`, `DOCS_DIR`
+  y `ENV_FILE`. Mover un módulo ya no cambia dónde vive la BD ni la clave maestra.
+- **El código nunca escribe dentro del paquete**; todo lo mutable cae en `data/`,
+  que está gitignored en bloque (antes `*.log` no cubría los rotados `.log.1`).
+- **`run.py` es el entrypoint estable** que usa systemd, así que reorganizar el
+  paquete por dentro no obliga a tocar las unidades.
 
 También hay **memoria de Claude** en
 `~/.claude/projects/-home-pi-project/memory/` (`jobhunter-project.md`,

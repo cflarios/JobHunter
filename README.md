@@ -1,101 +1,132 @@
 # JobHunter
 
-Buscador personal de empleos remotos, auto-alojado en la Raspberry Pi.
-Enfocado inicialmente en **DevOps Engineer** (remoto / contractor), ampliable a cualquier rol.
+Buscador personal de empleos remotos, auto-alojado en una Raspberry Pi, con
+emparejamiento de CV por IA. Enfocado en **DevOps / SRE** remoto (contractor desde
+Colombia), ampliable a cualquier rol.
+
+> Este README es **operativo** (cómo se usa y se despliega). El **porqué**, las
+> decisiones y los gotchas están en [`docs/CONTEXT.md`](docs/CONTEXT.md).
 
 ## Acceso
 - Desde la Pi: http://localhost:8080
-- Desde la red local: http://192.168.1.11:8080
+- Desde la LAN: http://192.168.1.11:8080
+
+## Estructura
+
+```
+job-hunter/
+├── jobhunter/          # el paquete de la aplicación
+│   ├── app.py          # servidor Flask: rutas, filtros Jinja, planificador
+│   ├── paths.py        # rutas del proyecto resueltas en un solo sitio
+│   ├── db.py           # esquema SQLite (9 tablas) + carga del .env
+│   ├── fetcher.py      # 12 fuentes de empleo, filtros y orquestación
+│   ├── skills.py       # extracción de skills técnicas del texto
+│   ├── llm.py          # router de IA: Claude o Gemini
+│   ├── cv.py           # CV + IA: perfil, afinidad, ¿encajo?, carta, CV a medida
+│   ├── cvpdf.py        # renderiza los CVs a PDF (fpdf2)
+│   ├── reviews.py      # resumen de reputación de empresas
+│   ├── notifier.py     # notificaciones (email SMTP + Telegram)
+│   ├── keystore.py     # secretos cifrados (Fernet)
+│   ├── applog.py       # log central rotativo
+│   ├── templates/      # 12 vistas Jinja2
+│   └── static/
+├── data/               # runtime, NO versionado: jobs.db, secret.key, logs/
+├── docs/               # CONTEXT.md + mapas (architecture.*, workflow.html)
+├── deploy/             # unidades systemd (referencia, sin secretos)
+├── scripts/run_search.sh
+├── run.py              # punto de entrada
+├── requirements.txt
+└── .env                # secretos de desarrollo (NO versionado)
+```
+
+Todo lo que se genera en runtime vive en `data/`; el código nunca escribe dentro
+del paquete. Las rutas se resuelven en `jobhunter/paths.py`.
+
+## Puesta en marcha
+
+```bash
+python3 -m venv .venv && ./.venv/bin/pip install -r requirements.txt
+cp .env.example .env        # rellena las claves que uses
+./.venv/bin/python run.py   # http://localhost:8080
+```
 
 ## Páginas
-- **Empleos** — lista lo encontrado con fuente, salario y fecha de publicación; filtros por texto, búsqueda, fuente y ventana de días; botón "Buscar ahora".
-- **Compañías** — empleadores reales detrás de las ofertas (no las bolsas); enlace a Glassdoor y resumen de opiniones generado por Claude + búsqueda web (ver abajo). Puedes **bloquear** empresas ("🚫 Bloquear") para que no aparezcan más en las búsquedas.
-- **Búsquedas** — añadir/pausar/eliminar términos; palabras clave de título, filtro de ubicación y ventana por búsqueda.
-- **Notificaciones** — historial de hallazgos; badge de no leídas se actualiza cada 30 s.
+- **Empleos** — lo encontrado con fuente, salario, fecha y skills; filtros por
+  texto/búsqueda/fuente/ventana; % de afinidad con tu CV; por oferta: *¿encajo
+  aquí?*, *carta* y **CV a medida** (ATS).
+- **Compañías** — empleadores reales (no las bolsas). La píldora de ofertas
+  despliega sus vacantes con enlace directo a la postulación. Glassdoor y resumen
+  de reputación por IA. Se pueden **bloquear** (subsección *Bloqueos*).
+- **Mi CV** — sube el CV y la IA extrae tu perfil, puntúa empleos, mejora el
+  currículum y **genera uno nuevo en PDF** (es la referencia del sistema).
+- **Búsquedas** — términos, palabras clave de título, ubicación, ventana, RapidAPI.
+- **Notificaciones** — historial in-app (badge cada 30 s).
+- **Logs** — consola en vivo del comportamiento de la app.
+- **Configuración** — proveedor de IA + claves, notificaciones y horarios.
 
-## Proveedor de IA seleccionable (Claude / Gemini)
-Toda la IA (resúmenes de empresas y CV) usa un **proveedor elegible desde la UI**
-(página **Búsquedas** → "Proveedor de IA"), por defecto **Claude** (Anthropic,
-`claude-opus-4-8`); **Gemini** (`gemini-2.5-flash`) queda como alternativa gratis.
-El botón "Resumen de opiniones" en **Compañías** resume la reputación (Glassdoor/
-Indeed: calificación, pros, contras, veredicto) con búsqueda web / *grounding*;
-se cachea en la BD. Glassdoor no tiene API pública gratuita ni permite scraping.
+## Configuración (página ⚙️)
 
-Cada proveedor usa su propia clave, en el `.env` del servicio (no en el código):
-`ANTHROPIC_API_KEY` para Claude y `GEMINI_API_KEY` para Gemini. Copia `.env.example`
-a `.env`, rellena las que uses y reinicia:
+**Proveedor de IA** — por defecto **Claude** (`claude-opus-4-8`); **Gemini**
+(`gemini-2.5-flash`) como alternativa gratis. Las claves se registran desde la web
+y se guardan **cifradas** (Fernet) en la BD; el `.env` es solo fallback de
+desarrollo. La clave maestra vive en `data/secret.key` (600, fuera del repo).
 
-```bash
-sudo systemctl restart jobhunter-web.service
-```
+**Notificaciones** — avisos de empleos nuevos por **email (SMTP)** y/o
+**Telegram**, en modo **inmediato** y/o **resumen diario** a una hora fija. Para
+Gmail hace falta una *contraseña de aplicación*. Botón de envío de prueba.
 
-Sin la key, el enlace a Glassdoor funciona igual; solo el resumen automático queda
-deshabilitado (con un aviso). Obtén una key gratis en https://aistudio.google.com/apikey
-Para cambiar de modelo, edita `MODEL` en `reviews.py`.
+**Programación de búsquedas** — una o varias horas al día (hora de Colombia). Lo
+ejecuta un planificador dentro de la app web, no un timer de systemd.
 
 ## Fuentes — 12
+
 Sin API key (10): Remotive · RemoteOK · Jobicy · Himalayas · WeWorkRemotely
-(DevOps + Programming) · Arbeitnow · The Muse · Working Nomads · Landing.jobs
-(con salario) · Get on Board (LATAM, con salario en USD).
+(DevOps + Programming) · Arbeitnow · The Muse · Working Nomads · Landing.jobs ·
+Get on Board (LATAM, salario en USD).
 
-Vía RapidAPI (con `RAPIDAPI_KEY`) — **apagadas por defecto** (cuota limitada); se
-activan con la casilla **"Fuentes RapidAPI"** en la página Búsquedas
-(setting `use_rapidapi`). Con el interruptor apagado, el cron diario y "Buscar
-ahora" solo usan las 10 fuentes gratuitas y no gastan cuota.
-- **LinkedIn** (`linkedin-job-search-api`, endpoint `active-jb`) — salario,
-  modalidad y skills. Muy geo-etiquetado: en modo "mundial" rinde poco; usar modo
-  "América" para US-remote. El plan BASIC tiene **cuota mensual** limitada (al
-  agotarse, 429 → la fuente devuelve vacío sin romper).
-- **JSearch** (`jsearch.p.rapidapi.com`, endpoint `search`) — agrega Google for
-  Jobs (LinkedIn, Indeed, Glassdoor, ZipRecruiter…). Requiere que la suscripción
-  exponga el endpoint `/search` (los demás endpoints pueden estar activos antes;
-  si `/search` da 404, esperar la propagación o revisar el plan).
+Vía RapidAPI (con `RAPIDAPI_KEY`), **apagadas por defecto** por su cuota mensual;
+se activan con la casilla *Fuentes RapidAPI* en Búsquedas: **LinkedIn** y
+**JSearch** (Google for Jobs).
 
-### RapidAPI (para añadir más APIs de esta plataforma)
-La key se guarda como `RAPIDAPI_KEY` en el override de systemd de **ambos**
-servicios (web y search), fuera del repo. En `fetcher.py` hay un helper genérico
-`_rapidapi_get(host, path, params)` que pone las cabeceras `x-rapidapi-host/key`.
-Añadir otra fuente de RapidAPI = escribir `fetch_x(query)` que llame a
-`_rapidapi_get(...)` y agregarla a `SOURCES`. Si falta la key, esas fuentes se
-omiten en silencio.
+**Añadir una fuente:** escribe `fetch_x(query)` en `jobhunter/fetcher.py` que
+devuelva dicts con `title/company/url/source/salary/location/posted_ts` y súmala a
+`SOURCES` (para RapidAPI, usa el helper `_rapidapi_get()` y añádela también a
+`RAPIDAPI_SOURCES`). Los filtros se aplican por igual a todas.
 
-## Mi CV + IA — pestaña "Mi CV"
-Sube tu CV (PDF o texto pegado) y la IA (el proveedor activo):
-- extrae tu **perfil** (rol, seniority, años, skills) y sugiere palabras clave de título;
-- puntúa cada empleo por **afinidad 0–100** (badge y orden en la pestaña Empleos);
-- **"¿Encajo aquí?"** por oferta: coincidencias, gaps y qué resaltar;
-- **carta de presentación** a medida por oferta;
-- **mejora tu CV** (estilo Harvard/ATS): recomendaciones + resumen y logros reescritos;
-- **genera un CV nuevo en PDF** ("Generar CV nuevo (PDF)"): reescribe tu currículum
-  aplicando las recomendaciones y lo entrega en un PDF descargable de **máx. 2 páginas**
-  (`cvpdf.py` con fpdf2). No inventa datos: usa solo lo que aparece en tu CV/perfil.
-  Elige el **idioma**: Español, English o **ambos** (dos PDFs).
-
-El CV se guarda **solo en la Pi** (tablas `profile` y `job_matches`); "Borrar perfil"
-lo elimina. Usa el mismo proveedor de IA que los resúmenes de empresas.
-
-Para añadir una fuente: crear una función `fetch_x(query)` en `fetcher.py` que
-devuelva dicts con las claves title/company/url/source/salary/location/posted_ts,
-y agregarla a la lista `SOURCES`. Los filtros de título, ubicación y fecha se
-aplican por igual a todas.
+## Filtros
+- El **título** debe contener alguna palabra clave del rol.
+- **Ubicación** según el modo (mundial / América / sin filtro).
+- Publicado dentro de la **ventana** configurada (3 días por defecto).
+- **Dedup** por URL; solo los empleos nuevos generan notificación.
+- Empresas en la **blacklist** se descartan antes que nada.
 
 ## Automatización (systemd)
-- `jobhunter-web.service` — servidor web (arranca en el boot, reinicio automático).
-- `jobhunter-search.timer` — corre la búsqueda **todos los días a las 12:00** (America/Bogota).
-  `Persistent=true`: si la Pi estuvo apagada al mediodía, recupera la corrida al encender.
+- `jobhunter-web.service` — servidor web + planificador; arranca en el boot,
+  `Restart=on-failure`.
+- `jobhunter-search.service` — `oneshot` para **corridas manuales**.
+- `jobhunter-search.timer` — **desactivado**: lo sustituye el planificador in-app,
+  cuyo horario se configura desde la web.
 
-### Comandos útiles
 ```bash
-sudo systemctl status jobhunter-web.service       # estado del sitio
-systemctl list-timers jobhunter-search.timer      # próxima corrida
-sudo systemctl start jobhunter-search.service     # forzar búsqueda ahora
-tail -f /home/pi/project/job-hunter/search.log     # log de las búsquedas
+sudo systemctl status jobhunter-web.service          # estado del sitio
+sudo systemctl restart jobhunter-web.service         # tras cambiar código
+sudo systemctl start jobhunter-search.service        # forzar búsqueda ahora
+journalctl -u jobhunter-web.service -f               # salida en vivo
+tail -f data/search.log                              # log de búsquedas
 ```
 
-## Filtros de resultados
-- Sólo ofertas publicadas dentro de la ventana configurada (3 días por defecto).
-- Coincidencia por término en título/descripción/etiquetas.
-- Deduplicado por URL; sólo empleos nuevos generan notificación.
+## Desarrollo
+
+```bash
+./.venv/bin/python run.py                     # app completa
+./.venv/bin/python -m jobhunter.fetcher       # una corrida de búsqueda
+./.venv/bin/python -m jobhunter.fetcher "Cloud Engineer"
+./.venv/bin/python -m jobhunter.notifier      # envía una notificación de prueba
+./.venv/bin/python -m jobhunter.db            # crea/actualiza el esquema
+```
 
 ## Datos
-SQLite en `jobs.db` (tablas: `searches`, `jobs`, `notifications`, `settings`).
+
+SQLite en `data/jobs.db` (WAL), 9 tablas: `searches`, `jobs`, `notifications`,
+`settings`, `blocked_companies`, `company_reviews`, `profile`, `job_matches`,
+`tailored_cvs`. El CV se guarda **solo en la Pi**; "Borrar perfil" lo elimina.

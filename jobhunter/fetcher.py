@@ -18,9 +18,9 @@ from xml.etree import ElementTree as ET
 
 import requests
 
-import applog
-from db import get_db, get_setting
-from skills import extract_skills_str
+from jobhunter import applog
+from jobhunter.db import get_db, get_setting
+from jobhunter.skills import extract_skills_str
 
 log = applog.get("search")
 
@@ -842,7 +842,7 @@ def run_all(query_override=None):
     # Notificación por el canal configurado (hoy: email). Nunca rompe la búsqueda.
     if all_new_jobs:
         try:
-            import notifier
+            from jobhunter import notifier
             ok, msg = notifier.send_new_jobs(all_new_jobs)
             log.info("Notificación %s — %s", "enviada" if ok else "omitida", msg)
         except Exception as e:
@@ -854,6 +854,6 @@ def run_all(query_override=None):
 
 if __name__ == "__main__":
     import sys
-    from db import init_db
+    from jobhunter.db import init_db
     init_db()
     run_all(sys.argv[1] if len(sys.argv) > 1 else None)

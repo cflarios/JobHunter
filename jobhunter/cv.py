@@ -11,7 +11,7 @@ excepción hacia el caller.
 """
 import json
 
-import llm
+from jobhunter import llm
 
 
 def _gemini(parts, json_out=True, max_tokens=2048):

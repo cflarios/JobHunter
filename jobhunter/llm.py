@@ -43,7 +43,7 @@ def resolve_provider(explicit=None):
     if env in PROVIDERS:
         return env
     try:
-        from db import get_db, get_setting
+        from jobhunter.db import get_db, get_setting
         con = get_db()
         p = get_setting(con, "ai_provider", DEFAULT_PROVIDER)
         con.close()
@@ -75,7 +75,7 @@ def _parse_json(txt):
 
 # --- Gemini ---------------------------------------------------------------- #
 def _gemini_key():
-    import keystore
+    from jobhunter import keystore
     return keystore.get_api_key("gemini")
 
 
@@ -121,7 +121,7 @@ def _gemini_complete(parts, json_out, max_tokens, web_search):
 
 # --- Claude (Anthropic) ---------------------------------------------------- #
 def _anthropic_key():
-    import keystore
+    from jobhunter import keystore
     return keystore.get_api_key("anthropic")
 
 

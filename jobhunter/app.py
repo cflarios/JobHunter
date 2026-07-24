@@ -4,16 +4,16 @@ from urllib.parse import quote_plus
 from flask import (Flask, render_template, request, redirect, url_for,
                    jsonify, flash, Response, send_file)
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+from jobhunter.paths import DOCS_DIR, SEARCH_LOG
 
-import applog
-from db import get_db, init_db, get_setting, set_setting
-import keystore
-from fetcher import run_all
-from reviews import generate_company_summary
-import cv as cvai
-import llm
-import notifier
+from jobhunter import applog
+from jobhunter.db import get_db, init_db, get_setting, set_setting
+from jobhunter import keystore
+from jobhunter.fetcher import run_all
+from jobhunter.reviews import generate_company_summary
+from jobhunter import cv as cvai
+from jobhunter import llm
+from jobhunter import notifier
 
 app = Flask(__name__)
 app.secret_key = "job-hunter-local-secret"
@@ -104,7 +104,7 @@ def index():
         sql += " ORDER BY (m.score IS NULL), m.score DESC, j.posted_ts DESC"
     else:
         sql += " ORDER BY j.posted_ts DESC, j.found_at DESC"
-    import skills as skl
+    from jobhunter import skills as skl
     # Empleos que ya tienen un CV adaptado (para mostrar la descarga al cargar).
     tailored_ids = {r["job_id"] for r in con.execute("SELECT job_id FROM tailored_cvs")}
     jobs = []
@@ -727,7 +727,7 @@ def cv_download():
     if lang not in langs:
         lang = "es" if "es" in langs else next(iter(langs))
     data = langs[lang]
-    import cvpdf
+    from jobhunter import cvpdf
     pdf_bytes = cvpdf.render(data, lang=lang)
     safe = "".join(c if c.isalnum() else "_" for c in (data.get("name") or "cv")).strip("_") or "cv"
     return send_file(BytesIO(pdf_bytes), mimetype="application/pdf",
@@ -830,7 +830,7 @@ def job_cv_download(job_id):
     except (ValueError, TypeError):
         flash("El CV a medida guardado no es válido; vuelve a generarlo.", "ok")
         return redirect(url_for("index"))
-    import cvpdf
+    from jobhunter import cvpdf
     pdf_bytes = cvpdf.render(data, lang=row["lang"] or "es")
     def _safe(s):
         return "".join(c if c.isalnum() else "_" for c in (s or "")).strip("_")
@@ -882,7 +882,7 @@ def api_unread():
 LOG_SOURCES = {
     "app":    {"label": "App", "kind": "file"},
     "search": {"label": "Búsquedas", "kind": "file",
-               "path": os.path.join(BASE_DIR, "search.log")},
+               "path": SEARCH_LOG},
     "web":    {"label": "Sistema · web", "kind": "unit",
                "unit": "jobhunter-web.service"},
     "svc":    {"label": "Sistema · búsqueda", "kind": "unit",
@@ -916,7 +916,7 @@ def _parse_journal(line):
             r"^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})[^ ]*\s+\S+\s+([^\[:]+)(?:\[\d+\])?:\s?(.*)$")
     m = _JOURNAL_RE.match(line)
     if not m:
-        import applog as al
+        from jobhunter import applog as al
         return al.parse(line)
     date, hhmmss, proc, msg = m.groups()
     low = msg.lower()
@@ -935,7 +935,7 @@ def logs_page():
 @app.route("/api/logs")
 def api_logs():
     """Líneas de log ya parseadas para la consola de la UI."""
-    import applog as al
+    from jobhunter import applog as al
     src = request.args.get("source", "app")
     if src not in LOG_SOURCES:
         src = "app"
@@ -965,7 +965,7 @@ def api_logs():
 @app.route("/logs/clear", methods=["POST"])
 def logs_clear():
     """Vacía el log de la app (los del sistema los gestiona journald)."""
-    import applog as al
+    from jobhunter import applog as al
     try:
         open(al.LOG_FILE, "w").close()
         log.info("Log de la app vaciado desde la UI")
@@ -977,7 +977,7 @@ def logs_clear():
 
 @app.route("/logs/download")
 def logs_download():
-    import applog as al
+    from jobhunter import applog as al
     if not os.path.exists(al.LOG_FILE):
         flash("Todavía no hay log de la app.", "ok")
         return redirect(url_for("logs_page"))
@@ -987,7 +987,7 @@ def logs_download():
 
 @app.route("/architecture")
 def architecture_page():
-    path = os.path.join(BASE_DIR, "architecture.html")
+    path = os.path.join(DOCS_DIR, "architecture.html")
     if not os.path.exists(path):
         return "architecture.html no encontrado", 404
     return send_file(path)
@@ -995,7 +995,7 @@ def architecture_page():
 
 @app.route("/architecture.json")
 def architecture_json_file():
-    path = os.path.join(BASE_DIR, "architecture.json")
+    path = os.path.join(DOCS_DIR, "architecture.json")
     if not os.path.exists(path):
         return jsonify(error="not found"), 404
     return send_file(path, mimetype="application/json")
@@ -1003,7 +1003,7 @@ def architecture_json_file():
 
 @app.route("/workflow")
 def workflow_page():
-    path = os.path.join(BASE_DIR, "workflow.html")
+    path = os.path.join(DOCS_DIR, "workflow.html")
     if not os.path.exists(path):
         return "workflow.html no encontrado", 404
     return send_file(path)
@@ -1090,8 +1090,13 @@ def _scheduler():
         time.sleep(20)
 
 
-if __name__ == "__main__":
+def main(host="0.0.0.0", port=8080):
+    """Arranca la app: esquema al día, planificador en segundo plano y servidor."""
     init_db()
-    log.info("JobHunter arrancado — servidor en :8080 y planificador activo")
+    log.info("JobHunter arrancado — servidor en :%s y planificador activo", port)
     threading.Thread(target=_scheduler, daemon=True).start()
-    app.run(host="0.0.0.0", port=8080, debug=False)
+    app.run(host=host, port=port, debug=False)
+
+
+if __name__ == "__main__":
+    main()

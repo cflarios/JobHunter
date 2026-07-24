@@ -31,9 +31,9 @@ from email.utils import formataddr, formatdate, make_msgid
 
 import requests
 
-import applog
-from db import get_db, get_setting, set_setting
-import keystore
+from jobhunter import applog
+from jobhunter.db import get_db, get_setting, set_setting
+from jobhunter import keystore
 
 log = applog.get("notify")
 

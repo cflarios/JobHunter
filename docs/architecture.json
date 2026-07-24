@@ -473,13 +473,13 @@
   "deployment": {
     "web_service": {
       "unit": "jobhunter-web.service",
-      "exec": ".venv/bin/python app.py",
+      "exec": ".venv/bin/python run.py",
       "port": 8080,
       "restart": "on-failure"
     },
     "search_service": {
       "unit": "jobhunter-search.service",
-      "exec": "run_search.sh",
+      "exec": "scripts/run_search.sh",
       "type": "oneshot",
       "note": "solo corridas manuales; el disparo automático lo hace el planificador in-app"
     },
@@ -495,52 +495,72 @@
   },
   "files": [
     {
-      "file": "db.py",
-      "role": "Esquema y helpers de SQLite (7 tablas)"
+      "file": "run.py",
+      "role": "Punto de entrada estable (lo usa systemd); delega en jobhunter.app.main()"
     },
     {
-      "file": "fetcher.py",
-      "role": "11 fuentes (10 públicas + LinkedIn RapidAPI), helper _rapidapi_get, filtros, orquestación"
+      "file": "jobhunter/paths.py",
+      "role": "Rutas del proyecto resueltas en un único sitio (ROOT, data/, docs/, .env)"
     },
     {
-      "file": "app.py",
-      "role": "Servidor Flask, 22 rutas, filtro Markdown, favicon, mapas"
+      "file": "jobhunter/app.py",
+      "role": "Servidor Flask, rutas, filtro Markdown, favicon, mapas, planificador in-app"
     },
     {
-      "file": "llm.py",
+      "file": "jobhunter/db.py",
+      "role": "Esquema y helpers de SQLite (9 tablas); BD en data/jobs.db"
+    },
+    {
+      "file": "jobhunter/fetcher.py",
+      "role": "12 fuentes, helper _rapidapi_get, filtros, orquestación"
+    },
+    {
+      "file": "jobhunter/llm.py",
       "role": "Capa de proveedor de IA: enruta a Claude o Gemini según settings.ai_provider"
     },
     {
-      "file": "notifier.py",
-      "role": "Notificaciones multi-canal (email SMTP + Telegram) y multi-modo (inmediato / resumen diario); secretos cifrados (keystore)"
+      "file": "jobhunter/notifier.py",
+      "role": "Notificaciones multi-canal (email SMTP + Telegram) y multi-modo"
     },
     {
-      "file": "reviews.py",
-      "role": "Resumen de opiniones de empresas vía IA (llm.py) + búsqueda web"
+      "file": "jobhunter/applog.py",
+      "role": "Log central rotativo (data/logs/) compartido entre procesos + parseo para la UI"
     },
     {
-      "file": "cv.py",
-      "role": "CV + IA: analizar, match (usa el CV generado como referencia), ¿encajo?, carta, mejora, generar CV y CV a medida por vacante (ATS) con blindaje anti-alucinación"
+      "file": "jobhunter/keystore.py",
+      "role": "Secretos cifrados con Fernet; clave maestra en data/secret.key"
     },
     {
-      "file": "cvpdf.py",
-      "role": "Renderiza el CV nuevo a PDF (fpdf2 + DejaVu, ≤2 páginas)"
+      "file": "jobhunter/reviews.py",
+      "role": "Resumen de opiniones de empresas vía IA + búsqueda web"
     },
     {
-      "file": "run_search.sh",
-      "role": "Wrapper del cron con logging"
+      "file": "jobhunter/cv.py",
+      "role": "CV + IA: analizar, match (usa el CV generado), ¿encajo?, carta, mejora, CV nuevo y CV a medida por vacante con blindaje anti-alucinación"
     },
     {
-      "file": "templates/",
-      "role": "8 vistas Jinja2"
+      "file": "jobhunter/cvpdf.py",
+      "role": "Renderiza los CVs a PDF (fpdf2 + DejaVu, ≤2 páginas)"
+    },
+    {
+      "file": "jobhunter/templates/",
+      "role": "12 vistas Jinja2"
+    },
+    {
+      "file": "data/",
+      "role": "Runtime, no versionado: jobs.db, secret.key, logs/, search.log"
+    },
+    {
+      "file": "docs/",
+      "role": "CONTEXT.md y los mapas (architecture.json/html, workflow.html)"
+    },
+    {
+      "file": "scripts/run_search.sh",
+      "role": "Wrapper de corridas manuales (python -m jobhunter.fetcher)"
     },
     {
       "file": "deploy/",
       "role": "Unidades systemd (referencia)"
-    },
-    {
-      "file": "applog.py",
-      "role": "Log central rotativo compartido entre procesos + helpers de lectura/parseo para la página de Logs"
     }
   ],
   "security": [

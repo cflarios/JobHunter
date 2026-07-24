@@ -7,4 +7,4 @@ Wants=network-online.target
 Type=oneshot
 User=pi
 WorkingDirectory=/home/pi/project/job-hunter
-ExecStart=/home/pi/project/job-hunter/run_search.sh
+ExecStart=/home/pi/project/job-hunter/scripts/run_search.sh

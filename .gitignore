@@ -5,18 +5,13 @@
 __pycache__/
 *.py[cod]
 
-# Base de datos (datos generados en runtime)
-jobs.db
-jobs.db-wal
-jobs.db-shm
+# Datos en runtime: BD, clave maestra de cifrado y logs (ver jobhunter/paths.py)
+data/
 
-# Logs
+# Logs sueltos
 *.log
 
-# Secretos / entorno (claves y clave maestra de cifrado, nunca en el repo)
+# Secretos / entorno (nunca en el repo)
 .env
 *.key
 apikey.conf
-
-# Logs de la app (rotados: jobhunter.log.1, .2…)
-logs/

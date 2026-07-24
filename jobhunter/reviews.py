@@ -7,7 +7,7 @@ mensaje explicando cómo activarlo.
 """
 import re
 
-import llm
+from jobhunter import llm
 
 # Frases de preámbulo que a veces anteceden al resumen y hay que descartar.
 _PREAMBLE_RE = re.compile(
