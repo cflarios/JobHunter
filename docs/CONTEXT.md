@@ -504,6 +504,36 @@ sudo systemctl restart jobhunter-web.service       # tras cambios en app/templat
 
 ---
 
+## 10c. Docker (para replicar en otros equipos)
+
+El despliegue de referencia es **nativo con systemd** (la Pi). Además, en la raíz
+hay un `Dockerfile` + `docker-compose.yml` **listos pero no usados aquí**, para
+replicar el proyecto en cualquier equipo. Un **único contenedor** corre `run.py`:
+web + planificador (hilo) + notificaciones. Decisiones y gotchas:
+
+- **Base `python:3.13-slim`.** Se instala **`fonts-dejavu-core`** porque
+  `cvpdf.py` referencia `/usr/share/fonts/truetype/dejavu/DejaVuSans*.ttf` (sin la
+  fuente, el PDF del CV falla). `tzdata` para que el planificador respete `TZ`.
+- **Solo se copia lo de runtime**: `jobhunter/`, `docs/` (lo sirven `/architecture`
+  y `/workflow`) y `run.py`. `deploy/`, `scripts/`, `.venv/` y **los secretos** se
+  excluyen vía `.dockerignore` (crítico: nunca hornear `.env`, `*.key` ni la BD).
+- **Datos en el volumen `jobhunter-data` → `/app/data`.** Usuario no-root (`app`,
+  uid 1000); con volumen con nombre Docker hereda el propietario, así que las
+  escrituras (BD, `secret.key`, logs) funcionan sin ajustes de permisos.
+- **Claves de IA opcionales**: por entorno (`${VAR:-}` en compose, sustituido
+  desde un `.env` junto al compose) o cifradas desde la UI. `db._load_dotenv` usa
+  `setdefault`, así que las variables de entorno del contenedor mandan.
+- **Logs de systemd (journald) no existen en el contenedor**: `app._journal_lines`
+  degrada con un mensaje controlado; las fuentes de fichero (app/búsquedas) sí van.
+- **Healthcheck** contra `/api/unread` (ligero). `restart: unless-stopped`.
+- **Verificado en la Pi** (build + smoke test): 9 rutas 200, PDF con acentos,
+  esquema (11 tablas), TZ America/Bogota y persistencia tras reiniciar el contenedor.
+- **Gotcha:** no migrar a gunicorn multi-worker — el planificador es un hilo
+  demonio **in-process**; con varios workers habría varios planificadores. `run.py`
+  (un proceso) es lo correcto, igual que en la Pi.
+
+---
+
 ## 11. Secretos y `.env`
 
 - Las claves (`ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `RAPIDAPI_KEY`) viven **solo**

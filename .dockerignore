@@ -1,0 +1,23 @@
+# Nunca meter en la imagen: secretos, datos de runtime ni el entorno local.
+.env
+.env.*
+*.key
+data/
+*.log
+
+# Entorno y artefactos locales
+.venv/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+.git/
+.gitignore
+
+# Los propios ficheros Docker no hacen falta dentro de la imagen
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# Referencia de despliegue nativo (no se usa en el contenedor)
+deploy/
+scripts/

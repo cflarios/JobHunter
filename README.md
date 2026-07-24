@@ -36,6 +36,8 @@ job-hunter/
 ├── deploy/             # unidades systemd (referencia, sin secretos)
 ├── scripts/run_search.sh
 ├── run.py              # punto de entrada
+├── Dockerfile          # imagen autocontenida (opcional, para replicar)
+├── docker-compose.yml  # un contenedor: web + planificador + notificaciones
 ├── requirements.txt
 └── .env                # secretos de desarrollo (NO versionado)
 ```
@@ -50,6 +52,29 @@ python3 -m venv .venv && ./.venv/bin/pip install -r requirements.txt
 cp .env.example .env        # rellena las claves que uses
 ./.venv/bin/python run.py   # http://localhost:8080
 ```
+
+### Con Docker (replicar en cualquier equipo)
+
+La instalación de referencia corre nativa en la Pi (systemd, arriba). Para
+**replicar el proyecto en otro dispositivo** hay un `Dockerfile` y un
+`docker-compose.yml` listos: un solo contenedor sirve la web, el planificador y
+las notificaciones.
+
+```bash
+docker compose up -d          # construye y arranca en http://localhost:8080
+docker compose logs -f        # salida en vivo
+docker compose down           # detener (los datos persisten en el volumen)
+```
+
+- Los datos (BD, clave maestra de cifrado y logs) viven en el volumen
+  `jobhunter-data`, así que sobreviven a recrear el contenedor.
+- Las **claves de IA** son opcionales al arrancar: se pueden registrar cifradas
+  desde la UI (Configuración) o pasarlas por entorno creando un `.env` junto al
+  compose (`ANTHROPIC_API_KEY=…`, `GEMINI_API_KEY=…`, `RAPIDAPI_KEY=…`).
+- Cambia el puerto con `PORT=9000 docker compose up -d` y la zona horaria del
+  planificador con `TZ=Europe/Madrid` (por defecto `America/Bogota`).
+- La página **Logs** muestra las fuentes de la app; las de systemd (journald) no
+  existen dentro del contenedor y aparecen como no disponibles (sin romper).
 
 ## Páginas
 - **Empleos** — lo encontrado con fuente, salario, fecha, skills y un extracto de

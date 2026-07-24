@@ -1,0 +1,35 @@
+# JobHunter con Docker Compose.
+#
+#   docker compose up -d      # construye y arranca en segundo plano
+#   docker compose logs -f    # ver la salida en vivo
+#   docker compose down       # detener (los datos persisten en el volumen)
+#
+# Claves de IA: opcionales aquí (también se pueden registrar cifradas desde la UI
+# en Configuración). Si las quieres por entorno, crea un fichero .env junto a este
+# con ANTHROPIC_API_KEY=..., GEMINI_API_KEY=..., RAPIDAPI_KEY=... y Compose las
+# sustituye abajo automáticamente.
+
+services:
+  jobhunter:
+    build: .
+    image: jobhunter:latest
+    container_name: jobhunter
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8080}:8080"          # cambia el puerto del host con PORT=9000
+    environment:
+      TZ: ${TZ:-America/Bogota}       # el planificador usa esta zona horaria
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      RAPIDAPI_KEY: ${RAPIDAPI_KEY:-}
+    volumes:
+      - jobhunter-data:/app/data      # BD, clave maestra de cifrado y logs
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/api/unread', timeout=5)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+volumes:
+  jobhunter-data:                     # persiste aunque recrees el contenedor
