@@ -479,7 +479,7 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
   <section class="blk">
     <h2 class="sec">Seguridad y datos</h2>
     <ul class="list sec-list">
-      <li><b>Sin secretos en el repo.</b> <span class="mono">ANTHROPIC_API_KEY</span>, <span class="mono">GEMINI_API_KEY</span> y <span class="mono">RAPIDAPI_KEY</span> viven en un <span class="mono">.env</span> (600, no versionado); systemd lo carga con <span class="mono">EnvironmentFile</span> y <span class="mono">db.py</span> como respaldo. Cada proveedor de IA usa su propia clave.</li>
+      <li><b>Sin secretos en el repo.</b> <span class="mono">ANTHROPIC_API_KEY</span>, <span class="mono">GEMINI_API_KEY</span> y <span class="mono">RAPIDAPI_KEY</span> pueden ir en un <span class="mono">.env</span> (600, no versionado); systemd lo carga con <span class="mono">EnvironmentFile</span> y <span class="mono">db.py</span> como respaldo. Cada proveedor de IA usa su propia clave.</li>
       <li><b>Secretos cifrados en la BD.</b> Las claves de IA, la contraseña SMTP y el token de Telegram que registras desde la web se guardan <b>cifrados</b> (Fernet, <span class="mono">keystore.py</span>); la clave maestra vive en <span class="mono">secret.key</span> (600, fuera del repo). Un volcado de la BD solo revela ciphertext.</li>
       <li><b>.gitignore</b> excluye <span class="mono">.venv/</span>, <span class="mono">jobs.db*</span>, <span class="mono">*.log</span>, <span class="mono">*.key</span> y <span class="mono">.env</span> (se versiona <span class="mono">.env.example</span>).</li>
       <li><b>Render seguro.</b> Los resúmenes de la IA pasan por un filtro Markdown que escapa HTML antes de mostrarse.</li>
@@ -760,8 +760,8 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
           "detail": "renderiza el CV nuevo a PDF (DejaVu Sans para acentos); títulos de sección localizados (es/en); garantiza ≤2 páginas con doble pase. /cv/download?lang= lo sirve como adjunto"
         },
         {
-          "name": "ANTHROPIC_API_KEY / GEMINI_API_KEY",
-          "detail": "cada proveedor su propia clave en .env (600, fuera del repo); si falta la del activo, degrada con mensaje"
+          "name": "Claves de API (cifradas)",
+          "detail": "ANTHROPIC/GEMINI y RAPIDAPI registrables desde la UI y guardadas cifradas (Fernet, keystore.py); .env como fallback. fetcher._rapidapi_key() las resuelve por keystore, con efecto inmediato"
         },
         {
           "name": "cv.py · tailor_cv + _enforce_facts",

@@ -259,8 +259,8 @@
           "detail": "renderiza el CV nuevo a PDF (DejaVu Sans para acentos); títulos de sección localizados (es/en); garantiza ≤2 páginas con doble pase. /cv/download?lang= lo sirve como adjunto"
         },
         {
-          "name": "ANTHROPIC_API_KEY / GEMINI_API_KEY",
-          "detail": "cada proveedor su propia clave en .env (600, fuera del repo); si falta la del activo, degrada con mensaje"
+          "name": "Claves de API (cifradas)",
+          "detail": "ANTHROPIC/GEMINI y RAPIDAPI registrables desde la UI y guardadas cifradas (Fernet, keystore.py); .env como fallback. fetcher._rapidapi_key() las resuelve por keystore, con efecto inmediato"
         },
         {
           "name": "cv.py · tailor_cv + _enforce_facts",

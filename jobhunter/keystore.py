@@ -15,9 +15,11 @@ from jobhunter.db import get_db, get_setting, set_setting
 
 from jobhunter.paths import SECRET_KEY_FILE as _KEY_FILE
 
-_SETTING = {"anthropic": "apikey_anthropic", "gemini": "apikey_gemini"}
+_SETTING = {"anthropic": "apikey_anthropic", "gemini": "apikey_gemini",
+            "rapidapi": "apikey_rapidapi"}
 _ENV = {"anthropic": ("ANTHROPIC_API_KEY",),
-        "gemini": ("GEMINI_API_KEY", "GOOGLE_API_KEY")}
+        "gemini": ("GEMINI_API_KEY", "GOOGLE_API_KEY"),
+        "rapidapi": ("RAPIDAPI_KEY",)}
 
 
 def _fernet():

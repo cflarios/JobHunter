@@ -536,7 +536,7 @@ web + planificador (hilo) + notificaciones. Decisiones y gotchas:
 
 ## 11. Secretos y `.env`
 
-- Las claves (`ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `RAPIDAPI_KEY`) viven **solo**
+- Las claves (`ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `RAPIDAPI_KEY`) pueden vivir
   en `.env` (permisos 600, **gitignored**). `.env.example` es la plantilla
   versionada. Cada proveedor de IA usa su propia clave; si falta la del proveedor
   activo, la IA degrada con un mensaje que sugiere cambiar de proveedor.
@@ -547,7 +547,14 @@ web + planificador (hilo) + notificaciones. Decisiones y gotchas:
   (fallback); las claves que el usuario registra desde la web se guardan **cifradas
   en la BD** vía **`keystore.py`**:
   - `keystore.set_api_key(provider, value)` cifra con **Fernet** y guarda en
-    `settings` (`apikey_anthropic`/`apikey_gemini`); value vacío → borra.
+    `settings` (`apikey_anthropic`/`apikey_gemini`/**`apikey_rapidapi`**); value
+    vacío → borra. **RapidAPI también se registra desde la UI** (Configuración →
+    «🔑 Clave de RapidAPI»), no solo las de IA: alimenta las fuentes LinkedIn y
+    JSearch. `fetcher._rapidapi_key()` la resuelve por keystore (BD → `.env`), así
+    que la clave tiene **efecto inmediato sin reiniciar**; el import de keystore va
+    **dentro** de la función para no crear un ciclo (keystore → db → …). La UI marca
+    con una píldora «desde .env» cuando la clave efectiva viene del fichero, y solo
+    ofrece borrar si está en la BD (no se puede borrar lo que vive en el `.env`).
   - `keystore.get_api_key(provider)` = **BD (descifrada) → fallback `.env`**.
     `llm.py` (`_anthropic_key`/`_gemini_key`) lo usa; efecto inmediato sin reiniciar.
   - **Clave maestra Fernet en `secret.key`** (fichero aparte, permisos 600,

@@ -60,6 +60,48 @@
   </details>
 </div>
 
+<!-- ==================== RAPIDAPI ==================== -->
+<div class="card" id="rapidapi">
+  <div class="row" style="justify-content:space-between;align-items:flex-start">
+    <div>
+      <h3 style="margin:0 0 4px">🔑 Clave de RapidAPI</h3>
+      <p class="muted" style="margin:0;font-size:13px;max-width:62ch">
+        Habilita las fuentes de empleo <b>LinkedIn</b> y <b>JSearch</b>. Sin clave,
+        esas dos fuentes se omiten en silencio y el resto sigue funcionando. Recuerda
+        que su plan gratuito tiene <b>cuota mensual</b>: se activan aparte, con la
+        casilla «Fuentes RapidAPI» en <a href="{{ url_for('searches') }}">Búsquedas</a>.
+      </p>
+    </div>
+    <div class="row" style="gap:6px">
+      {% if rapidapi.set %}<span class="pill" style="color:var(--accent2)">✓ configurada · {{ rapidapi.mask }}</span>
+      {% else %}<span class="pill" style="color:var(--warn)">no configurada</span>{% endif %}
+      {% if rapidapi.source == 'env' %}<span class="pill" title="Viene del .env; si guardas una aquí, esta manda">desde .env</span>{% endif %}
+    </div>
+  </div>
+  <div class="row" style="margin-top:12px;gap:8px;align-items:center">
+    <form method="post" class="row" style="gap:8px;flex:1;min-width:240px" autocomplete="off">
+      <input type="hidden" name="action" value="set_apikey">
+      <input type="hidden" name="provider" value="rapidapi">
+      <input type="password" name="api_key" autocomplete="new-password" spellcheck="false"
+             placeholder="{{ 'Pega una clave nueva para reemplazarla…' if rapidapi.set else 'Pega aquí tu API key de RapidAPI…' }}"
+             style="flex:1;min-width:200px">
+      <button class="btn sm" type="submit" title="Guardar clave" aria-label="Guardar clave"
+              style="font-size:15px;line-height:1">💾</button>
+    </form>
+    {% if rapidapi.set and rapidapi.source == 'db' %}
+    <form method="post" data-confirm="Se borrará la clave de RapidAPI. Las fuentes LinkedIn y JSearch dejarán de traer empleos."
+          data-confirm-title="Borrar clave" data-confirm-label="Borrar" data-confirm-danger>
+      <input type="hidden" name="action" value="clear_apikey">
+      <input type="hidden" name="provider" value="rapidapi">
+      <button class="btn sm ghost" type="submit" title="Borrar clave" aria-label="Borrar clave"
+              style="font-size:15px;line-height:1">🗑</button>
+    </form>
+    {% endif %}
+    <a href="{{ rapidapi.get_url }}" target="_blank" rel="noopener" style="font-size:13px">Obtener clave ↗</a>
+  </div>
+  <p class="muted" style="margin:10px 0 0;font-size:12px">Se guarda <b>cifrada</b> en la Pi y tiene efecto inmediato, sin reiniciar.</p>
+</div>
+
 <!-- ==================== PROGRAMACIÓN ==================== -->
 <div class="card" id="programacion">
   <h3 style="margin-top:0">⏰ Programación de búsquedas</h3>

@@ -96,10 +96,12 @@ docker compose down           # detener (los datos persisten en el volumen)
 
 ## Configuración (página ⚙️)
 
+**Claves de API** — las de IA (Claude/Gemini) y la de **RapidAPI** se registran
+desde la web y se guardan **cifradas** (Fernet) en la BD; el `.env` queda como
+fallback. La clave maestra vive en `data/secret.key` (600, fuera del repo).
+
 **Proveedor de IA** — por defecto **Claude** (`claude-opus-4-8`); **Gemini**
-(`gemini-2.5-flash`) como alternativa gratis. Las claves se registran desde la web
-y se guardan **cifradas** (Fernet) en la BD; el `.env` es solo fallback de
-desarrollo. La clave maestra vive en `data/secret.key` (600, fuera del repo).
+(`gemini-2.5-flash`) como alternativa gratis.
 
 **Notificaciones** — avisos de empleos nuevos por **email (SMTP)** y/o
 **Telegram**, en modo **inmediato** y/o **resumen diario** a una hora fija. Para
@@ -114,9 +116,11 @@ Sin API key (10): Remotive · RemoteOK · Jobicy · Himalayas · WeWorkRemotely
 (DevOps + Programming) · Arbeitnow · The Muse · Working Nomads · Landing.jobs ·
 Get on Board (LATAM, salario en USD).
 
-Vía RapidAPI (con `RAPIDAPI_KEY`), **apagadas por defecto** por su cuota mensual;
-se activan con la casilla *Fuentes RapidAPI* en Búsquedas: **LinkedIn** y
-**JSearch** (Google for Jobs).
+Vía RapidAPI, **apagadas por defecto** por su cuota mensual; se activan con la
+casilla *Fuentes RapidAPI* en Búsquedas: **LinkedIn** y **JSearch** (Google for
+Jobs). La clave se registra desde **Configuración → 🔑 Clave de RapidAPI** (se
+guarda cifrada, efecto inmediato) o, como alternativa, en `RAPIDAPI_KEY` del
+`.env`. Sin clave, esas dos fuentes se omiten en silencio.
 
 **Añadir una fuente:** escribe `fetch_x(query)` en `jobhunter/fetcher.py` que
 devuelva dicts con `title/company/url/source/salary/location/posted_ts` y súmala a

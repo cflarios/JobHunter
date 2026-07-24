@@ -268,8 +268,9 @@ def settings_page():
             flash("Proveedor de IA actualizado a " + llm.provider_label(prov) + ".", "ok")
         elif action in ("set_apikey", "clear_apikey"):
             provider = request.form.get("provider", "")
-            label = "Claude (Anthropic)" if provider == "anthropic" else "Gemini"
-            if provider not in ("anthropic", "gemini"):
+            label = {"anthropic": "Claude (Anthropic)", "gemini": "Gemini",
+                     "rapidapi": "RapidAPI"}.get(provider, provider)
+            if provider not in ("anthropic", "gemini", "rapidapi"):
                 flash("Proveedor inválido.", "ok")
             elif action == "clear_apikey":
                 keystore.set_api_key(provider, "")
@@ -344,6 +345,7 @@ def settings_page():
 
     ak = keystore.get_api_key("anthropic")
     gk = keystore.get_api_key("gemini")
+    rk = keystore.get_api_key("rapidapi")
     providers = [
         {"id": "anthropic", "name": "Claude (Anthropic)", "paid": True,
          "get_url": "https://console.anthropic.com/settings/keys",
@@ -352,6 +354,11 @@ def settings_page():
          "get_url": "https://aistudio.google.com/apikey",
          "set": bool(gk), "mask": _mask_key(gk)},
     ]
+    # No es un proveedor de IA: alimenta las fuentes de empleo LinkedIn y JSearch.
+    rapidapi = {"id": "rapidapi", "name": "RapidAPI (LinkedIn · JSearch)",
+                "get_url": "https://rapidapi.com/developer/apps",
+                "set": bool(rk), "mask": _mask_key(rk),
+                "source": keystore.key_source("rapidapi")}
     notify = {
         "enabled": ncfg["enabled"], "immediate": ncfg["immediate"],
         "digest": ncfg["digest"], "digest_time": ncfg["digest_time"],
@@ -366,7 +373,7 @@ def settings_page():
     }
     return render_template("settings.html", ai_provider=ai_provider,
                            providers=providers, notify=notify,
-                           search_times=search_times)
+                           search_times=search_times, rapidapi=rapidapi)
 
 
 @app.route("/run", methods=["POST"])

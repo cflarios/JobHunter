@@ -605,13 +605,25 @@ def fetch_getonbrd(query):
 # se lee de RAPIDAPI_KEY (override de systemd, fuera del repo); si falta, la    #
 # fuente se omite en silencio (devuelve []).                                    #
 # --------------------------------------------------------------------------- #
+def _rapidapi_key():
+    """Clave efectiva de RapidAPI: BD (cifrada, registrada en la UI) → .env.
+
+    Se importa aquí dentro para evitar un ciclo de imports (keystore → db).
+    """
+    try:
+        from jobhunter import keystore
+        return keystore.get_api_key("rapidapi")
+    except Exception:
+        return os.environ.get("RAPIDAPI_KEY")
+
+
 def rapidapi_enabled():
-    return bool(os.environ.get("RAPIDAPI_KEY"))
+    return bool(_rapidapi_key())
 
 
 def _rapidapi_get(host, path, params):
     """GET a un endpoint de RapidAPI. Devuelve JSON o None (si falta key/err)."""
-    key = os.environ.get("RAPIDAPI_KEY")
+    key = _rapidapi_key()
     if not key:
         return None
     try:
