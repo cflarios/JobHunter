@@ -102,9 +102,22 @@
       </div>
       {% endif %}
       {% if j.match_reason %}<div class="muted" style="font-size:12.5px;margin-top:6px">✦ {{ j.match_reason }}</div>{% endif %}
+      {% if j.description %}
+      <details class="ai-box" style="margin-top:8px;border-left-color:var(--mut)">
+        <summary>📄 Descripción de la oferta<span class="chev">▾</span></summary>
+        <div class="ai-body" style="font-size:13px;color:var(--mut);white-space:pre-wrap;max-height:280px;overflow:auto">{{ j.description }}</div>
+      </details>
+      {% endif %}
     </div>
     <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;min-width:120px">
       <a class="btn sm" href="{{ j.url }}" target="_blank" rel="noopener">Ver oferta →</a>
+      <select class="track-sel" data-id="{{ j.id }}" title="Estado de tu postulación"
+              style="padding:5px 8px;font-size:12px;max-width:150px;{{ 'color:%s;border-color:%s'|format(j.track_meta.color, j.track_meta.color) if j.track_meta }}">
+        <option value="__none__" {{ 'selected' if not j.track }}>Sin seguimiento</option>
+        {% for s in stages %}<option value="{{ s.key }}" {{ 'selected' if j.track==s.key }}>{{ s.icon }} {{ s.label }}</option>{% endfor %}
+        <option disabled>──────</option>
+        {% for o in outcomes %}<option value="{{ o.key }}" {{ 'selected' if j.track==o.key }}>{{ o.icon }} {{ o.label }}</option>{% endfor %}
+      </select>
       {% if has_profile %}
       <button class="btn sm ghost fit-btn" data-id="{{ j.id }}">¿Encajo aquí?</button>
       <button class="btn sm ghost cover-btn" data-id="{{ j.id }}">✉ Carta</button>
@@ -234,6 +247,21 @@
             }
           }).catch(function(){ unspin(go); });
       });
+    });
+  });
+  // --- Seguimiento de postulación: guarda al vuelo, sin recargar ---
+  var STCOLOR = {{ (stages + outcomes)|map(attribute='key')|list|tojson }}
+    .reduce(function(acc,k,i){ acc[k]={{ (stages + outcomes)|map(attribute='color')|list|tojson }}[i]; return acc; },{});
+  document.querySelectorAll('.track-sel').forEach(function(sel){
+    sel.addEventListener('change',function(){
+      var fd=new FormData(); fd.append('status', sel.value);
+      sel.disabled=true;
+      fetch('/jobs/'+sel.dataset.id+'/status',{method:'POST',headers:{'X-Requested-With':'fetch'},body:fd})
+        .then(function(r){return r.json();}).then(function(d){
+          sel.disabled=false;
+          var c = d.status ? STCOLOR[d.status] : '';
+          sel.style.color = c || ''; sel.style.borderColor = c || '';
+        }).catch(function(){ sel.disabled=false; });
     });
   });
   // spinner al recalcular afinidad (POST síncrono largo)

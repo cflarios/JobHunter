@@ -52,6 +52,7 @@ job-hunter/
 │   ├── llm.py          # Capa de proveedor de IA: enruta a Claude o Gemini
 │   ├── applog.py       # Log central rotativo + lectura/parseo para la UI
 │   ├── notifier.py     # Notificaciones multi-canal (email SMTP + Telegram)
+│   ├── tracker.py      # Seguimiento de postulaciones: estados, embudo y métricas
 │   ├── reviews.py      # Resumen de reputación de empresas (IA + búsqueda web)
 │   ├── cv.py           # CV + IA: perfil, match, ¿encajo?, carta, CV nuevo,
 │   │                   #   CV a medida por vacante (ATS) + blindaje anti-alucinación
@@ -328,18 +329,20 @@ usuario activa. `notifier` despacha a **todos los canales activos y bien configu
 
 ---
 
-## 8. Base de datos (SQLite `jobs.db`, WAL) — 9 tablas
+## 8. Base de datos (SQLite `jobs.db`, WAL) — 11 tablas
 
 | Tabla | Para qué |
 |---|---|
 | `searches` | Búsquedas: query, title_keywords, max_age_days, active |
 | `blocked_companies` | Blacklist: empresas que no deben aparecer (name PRIMARY KEY COLLATE NOCASE) |
-| `jobs` | Empleos: title, company, url (unique), source, salary, location, posted_ts, skills, is_new |
+| `jobs` | Empleos: title, company, url (unique), source, salary, location, posted_ts, skills, **description** (extracto), is_new |
 | `notifications` | Avisos de hallazgos (read) |
 | `settings` | Config global (location_mode, max_age_days, last_run, ai_provider, use_rapidapi, **search_times** [horas del planificador], last_scheduled_run, notify_* [enabled/immediate/digest/digest_time/email_on/telegram_on/email], smtp_*, telegram_chat_id, last_digest_date, app_base_url; `apikey_*`/`secret_smtp_password`/`secret_telegram_token` cifrados) |
 | `company_reviews` | Caché de resúmenes de empresa + resolved_name + glassdoor_url (página directa) |
 | `profile` | Perfil del CV (1 fila): cv_text, role, skills, summary, suggested_keywords, feedback, rewrite, generated_cv (JSON del CV nuevo) |
 | `job_matches` | Afinidad por empleo: score, reason, fit_detail |
+| `applications` | Estado ACTUAL de cada postulación: job_id (PK→jobs), status, applied_at, closed_at, notes |
+| `application_events` | HISTORIAL de transiciones (from_status→to_status): es lo que permite dibujar el embudo |
 | `tailored_cvs` | CV a medida por vacante: job_id (PK→jobs), lang, cv (JSON), notes, ats_score, job_desc, updated_at |
 
 ---
@@ -392,6 +395,43 @@ Formato pensado para parsearse en la UI:
   el journal por pertenecer al grupo `adm`.
 - **Gotcha:** los ficheros rotados se llaman `jobhunter.log.1`, `.2`… y **no** casan
   con el patrón `*.log` del `.gitignore`; por eso se ignora el directorio `logs/`.
+
+---
+
+## 9c. Seguimiento de postulaciones (`tracker.py`) y descripción de la oferta
+
+**Por qué hay dos tablas y no una.** `applications` guarda el estado **actual**;
+`application_events` guarda el **historial** de transiciones. Si una postulación
+acaba en `rechazado`, el estado actual no cuenta que pasó por entrevista técnica —
+y sin ese recorrido el embudo sería falso. El Sankey se construye contando
+transiciones reales (`_reached()` calcula la etapa **máxima alcanzada** por cada
+oferta a partir de los eventos).
+
+- **Etapas** (`STAGES`): interesado → postulado → screening → técnica → final →
+  oferta → aceptada. **Salidas** (`OUTCOMES`, desde cualquier etapa): rechazado,
+  sin respuesta (ghosteado), me retiré.
+- **Nodo «En curso».** Sin él el Sankey *pierde* flujo (llegaron 8, salen 7) y
+  parece un error de cuadre; en realidad son postulaciones esperando en esa etapa.
+  Se calcula con el estado actual y hace que **cada etapa cuadre**:
+  `llegaron = avanzan + caen + esperan`. Verificado con un escenario de 9 ofertas.
+- **Sankey dibujado a mano en SVG** (`applications.html`), sin librerías externas:
+  la Pi trabaja offline y el CSP de los artefactos bloquea CDNs. Nodos como barras
+  por columna, cintas de Bézier con grosor proporcional. Las salidas se colocan una
+  columna después de la última etapa de la que caen, para que ninguna cinta vaya
+  hacia atrás.
+- **Métricas**: tasa de respuesta/entrevista/oferta y `by_source()`, que responde a
+  «¿qué bolsa me responde de verdad?» — es lo que permite decidir dónde invertir.
+- **UI**: selector de estado en cada tarjeta de Empleos (AJAX, sin recargar) y
+  página **Postulaciones** (`/applications`) con embudo, KPIs, tabla por fuente y
+  listado filtrable (en curso / cerradas / todas).
+
+**Extracto de la descripción (`jobs.description`).** Se guarda al ingerir con
+`fetcher._excerpt()`: prefiere el campo `_desc` de la fuente (añadido a las 7 que
+lo traen) y si no, usa `_text` quitándole el título; limpia HTML y recorta a
+`DESC_MAX = 4000`. Resuelve la limitación de que el match usara **solo el título**:
+ahora `analyze_fit` recibe la descripción y el **CV a medida la usa como respaldo**
+si el usuario no pega nada. Las filas antiguas quedan vacías y se rellenan solas en
+la siguiente búsqueda (no se hace scraping retroactivo de las URLs).
 
 ---
 

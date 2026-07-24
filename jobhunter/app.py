@@ -14,6 +14,7 @@ from jobhunter.reviews import generate_company_summary
 from jobhunter import cv as cvai
 from jobhunter import llm
 from jobhunter import notifier
+from jobhunter import tracker
 
 app = Flask(__name__)
 app.secret_key = "job-hunter-local-secret"
@@ -107,6 +108,7 @@ def index():
     from jobhunter import skills as skl
     # Empleos que ya tienen un CV adaptado (para mostrar la descarga al cargar).
     tailored_ids = {r["job_id"] for r in con.execute("SELECT job_id FROM tailored_cvs")}
+    tracked = tracker.statuses_by_job()
     jobs = []
     for r in con.execute(sql, params).fetchall():
         j = dict(r)
@@ -115,6 +117,8 @@ def index():
         j["skill_list"] = ([s.strip() for s in stored.split(",") if s.strip()]
                            if stored else skl.extract_skills(j["title"]))
         j["tailored"] = j["id"] in tailored_ids
+        j["track"] = tracked.get(j["id"])
+        j["track_meta"] = tracker.META.get(j["track"]) if j["track"] else None
         jobs.append(j)
     prow = con.execute("SELECT generated_cv FROM profile WHERE id=1").fetchone()
     has_profile = prow is not None
@@ -139,7 +143,8 @@ def index():
                            sources=sources, unread=unread, stats=stats,
                            f_q=q, f_source=source, f_search=active_search,
                            f_days=days, f_sort=sort, has_profile=has_profile,
-                           n_matches=n_matches, cv_langs=cv_langs)
+                           n_matches=n_matches, cv_langs=cv_langs,
+                           stages=tracker.STAGES, outcomes=tracker.OUTCOMES)
 
 
 @app.route("/mark-seen", methods=["POST"])
@@ -770,6 +775,44 @@ def job_fit(job_id):
     return jsonify(ok=False, error=res.get("error", "")), 500
 
 
+@app.route("/applications")
+def applications_page():
+    """Embudo de postulaciones (Sankey) + métricas + listado."""
+    f = tracker.funnel()
+    view = request.args.get("view", "activas")
+    if view not in ("activas", "cerradas", "todas"):
+        view = "activas"
+    rows = tracker.applications(None if view == "todas" else view)
+    return render_template("applications.html", funnel=f, apps=rows, view=view,
+                           stages=tracker.STAGES, outcomes=tracker.OUTCOMES,
+                           by_source=tracker.by_source())
+
+
+@app.route("/jobs/<int:job_id>/status", methods=["POST"])
+def job_status(job_id):
+    """Cambia el estado de seguimiento de una oferta (AJAX o formulario)."""
+    status = request.form.get("status", "").strip()
+    if status == "__none__":
+        tracker.remove(job_id)
+        ok, msg = True, "Quitada del seguimiento."
+    else:
+        ok, msg = tracker.set_status(job_id, status,
+                                     request.form.get("note", "").strip() or None)
+    if ok and status != "__none__":
+        log.info("Postulación %s → %s", job_id, status)
+    if request.headers.get("X-Requested-With") == "fetch":
+        return jsonify(ok=ok, message=msg, status=None if status == "__none__" else status)
+    flash(msg, "ok")
+    return redirect(request.referrer or url_for("applications_page"))
+
+
+@app.route("/jobs/<int:job_id>/note", methods=["POST"])
+def job_note(job_id):
+    tracker.set_note(job_id, request.form.get("note", "").strip() or None)
+    flash("Nota guardada.", "ok")
+    return redirect(request.referrer or url_for("applications_page"))
+
+
 @app.route("/jobs/<int:job_id>/tailor", methods=["POST"])
 def job_tailor(job_id):
     """Adapta el CV generado a esta vacante (optimización ATS) y lo cachea."""
@@ -788,7 +831,8 @@ def job_tailor(job_id):
     lang = request.form.get("lang", "")
     if lang not in langs:
         lang = "es" if "es" in langs else next(iter(langs))
-    jd = request.form.get("jd", "").strip()[:12000]
+    # Si el usuario no pega nada, usamos el extracto que guardamos al ingerir.
+    jd = request.form.get("jd", "").strip()[:12000] or (job["description"] or "").strip()
     log.info("Generando CV a medida para «%s» (%s, %s, descripción: %s)",
              job["title"], job["company"] or "?", lang, "sí" if jd else "no")
     res = cvai.tailor_cv(langs[lang], dict(job), lang=lang, job_desc=jd or None, profile=p)

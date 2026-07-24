@@ -178,6 +178,8 @@ def analyze_fit(profile, job):
         f"PERFIL:\n{reference_blob(profile)}\n\n"
         f"OFERTA: {job.get('title')} | {job.get('company') or '?'} | "
         f"{job.get('location') or ''} | {job.get('salary') or ''}"
+        + (f"\nDESCRIPCIÓN:\n{str(job['description'])[:6000]}"
+           if job.get("description") else "")
     )
     ok, data = _gemini([{"text": instr}], json_out=True, max_tokens=1500)
     if not ok:

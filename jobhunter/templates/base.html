@@ -228,6 +228,7 @@ window.jhPaginate = function(listEl, itemSel, size, pagerEl){
   {%- if n=='jobs' -%}<rect x="2.5" y="7" width="19" height="13" rx="2.5"/><path d="M8.5 7V5.5a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2V7"/><path d="M2.5 12.5h19"/>
   {%- elif n=='companies' -%}<path d="M4 21V5.5A1.5 1.5 0 0 1 5.5 4h8A1.5 1.5 0 0 1 15 5.5V21"/><path d="M15 10h3.5A1.5 1.5 0 0 1 20 11.5V21"/><path d="M2.5 21h19"/><path d="M7.5 8h4M7.5 12h4M7.5 16h4"/>
   {%- elif n=='ban' -%}<circle cx="12" cy="12" r="8.5"/><path d="M6 6l12 12"/>
+  {%- elif n=='apps' -%}<path d="M4 19.5V5.5A1.5 1.5 0 0 1 5.5 4h6"/><path d="M4 19.5h16"/><rect x="6.5" y="12" width="3" height="5.5" rx="1"/><rect x="11.5" y="8.5" width="3" height="9" rx="1"/><rect x="16.5" y="5.5" width="3" height="12" rx="1"/>
   {%- elif n=='cv' -%}<path d="M14 3.5V8a1 1 0 0 0 1 1h4.5"/><path d="M19.5 9.5V19a2 2 0 0 1-2 2h-11a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2H14l5.5 6.5z"/><path d="M8.5 13.5h7M8.5 17h4.5"/>
   {%- elif n=='search' -%}<circle cx="11" cy="11" r="7"/><path d="M16.2 16.2L21 21"/>
   {%- elif n=='bell' -%}<path d="M18 9a6 6 0 1 0-12 0c0 4-1.5 5.5-2 6.5h16c-.5-1-2-2.5-2-6.5z"/><path d="M9.5 19a2.5 2.5 0 0 0 5 0"/>
@@ -242,6 +243,7 @@ window.jhPaginate = function(listEl, itemSel, size, pagerEl){
     <div class="side-sub">
       <a href="{{ url_for('blacklist_page') }}" class="{{ 'active' if request.endpoint=='blacklist_page' }}" title="Bloqueos — empresas que no quieres ver">{{ ico('ban') }}<span class="side-txt">Bloqueos</span></a>
     </div>
+    <a href="{{ url_for('applications_page') }}" class="{{ 'active' if request.endpoint=='applications_page' }}" title="Postulaciones — tu embudo">{{ ico('apps') }}<span class="side-txt">Postulaciones</span></a>
     <a href="{{ url_for('cv_page') }}" class="{{ 'active' if request.endpoint=='cv_page' }}" title="Mi CV">{{ ico('cv') }}<span class="side-txt">Mi CV</span></a>
     <a href="{{ url_for('searches') }}" class="{{ 'active' if request.endpoint=='searches' }}" title="Búsquedas">{{ ico('search') }}<span class="side-txt">Búsquedas</span></a>
     <a href="{{ url_for('notifications') }}" class="{{ 'active' if request.endpoint=='notifications' }}" title="Notificaciones">{{ ico('bell') }}<span class="side-txt">Notificaciones</span><span id="notif-badge" class="badge" style="display:none"></span></a>

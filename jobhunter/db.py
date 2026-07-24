@@ -88,6 +88,28 @@ CREATE TABLE IF NOT EXISTS job_matches(
     fit_detail TEXT,
     updated_at TEXT DEFAULT (datetime('now','localtime'))
 );
+-- Seguimiento de postulaciones. `applications` guarda el estado ACTUAL de cada
+-- oferta; `application_events` guarda el HISTORIAL de transiciones, que es lo que
+-- permite dibujar el embudo (Sankey): si una postulación acabó rechazada, el
+-- estado actual no diría que llegó a entrevista técnica, pero los eventos sí.
+CREATE TABLE IF NOT EXISTS applications(
+    job_id      INTEGER PRIMARY KEY REFERENCES jobs(id) ON DELETE CASCADE,
+    status      TEXT NOT NULL,
+    applied_at  TEXT,
+    closed_at   TEXT,
+    notes       TEXT,
+    created_at  TEXT DEFAULT (datetime('now','localtime')),
+    updated_at  TEXT DEFAULT (datetime('now','localtime'))
+);
+CREATE TABLE IF NOT EXISTS application_events(
+    id          INTEGER PRIMARY KEY,
+    job_id      INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+    from_status TEXT,
+    to_status   TEXT NOT NULL,
+    note        TEXT,
+    created_at  TEXT DEFAULT (datetime('now','localtime'))
+);
+CREATE INDEX IF NOT EXISTS idx_appev_job ON application_events(job_id, id);
 CREATE TABLE IF NOT EXISTS tailored_cvs(
     job_id     INTEGER PRIMARY KEY REFERENCES jobs(id) ON DELETE CASCADE,
     lang       TEXT,
@@ -115,7 +137,7 @@ def get_db():
 _MIGRATIONS = {
     "profile": {"generated_cv": "TEXT"},
     "company_reviews": {"glassdoor_url": "TEXT"},
-    "jobs": {"skills": "TEXT"},
+    "jobs": {"skills": "TEXT", "description": "TEXT"},
 }
 
 

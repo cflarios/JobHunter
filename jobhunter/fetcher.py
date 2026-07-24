@@ -70,6 +70,28 @@ def _fmt_date(ts):
     return dt.datetime.fromtimestamp(ts, dt.timezone.utc).strftime("%Y-%m-%d")
 
 
+DESC_MAX = 4000        # extracto guardado por oferta (suficiente para la IA y la UI)
+
+
+def _excerpt(job):
+    """Extracto legible de la descripción de una oferta.
+
+    Prefiere el campo propio de la fuente (`_desc`); si no lo hay, cae al `_text`
+    (título + descripción + tags) quitándole el título del principio. Se limpia el
+    HTML y se recorta a DESC_MAX. Devuelve "" si la fuente no da descripción.
+    """
+    raw = (job.get("_desc") or "").strip()
+    if not raw:
+        raw = (job.get("_text") or "").strip()
+        title = (job.get("title") or "").strip()
+        if title and raw.lower().startswith(title.lower()):
+            raw = raw[len(title):]
+    txt = _clean(raw)
+    if not txt:
+        return ""
+    return txt[:DESC_MAX].rstrip() + ("…" if len(txt) > DESC_MAX else "")
+
+
 def _clean(text):
     if not text:
         return ""
@@ -230,6 +252,7 @@ def fetch_remotive(query):
                 "salary": _clean(j.get("salary")),
                 "location": j.get("candidate_required_location") or "Remote",
                 "posted_ts": _to_ts(j.get("publication_date")),
+                "_desc": j.get("description", ""),
                 "_text": j.get("title", "") + " " + j.get("description", ""),
             })
     except Exception as e:
@@ -259,6 +282,7 @@ def fetch_remoteok(query):
                 "salary": sal,
                 "location": j.get("location") or "Remote",
                 "posted_ts": _to_ts(j.get("date") or j.get("epoch")),
+                "_desc": j.get("description", ""),
                 "_text": f"{j.get('position','')} {j.get('description','')} {tags}",
             })
     except Exception as e:
@@ -288,6 +312,7 @@ def fetch_jobicy(query):
                 "salary": sal,
                 "location": j.get("jobGeo") or "Remote",
                 "posted_ts": _to_ts(j.get("pubDate")),
+                "_desc": j.get("jobExcerpt", ""),
                 "_text": f"{j.get('jobTitle','')} {j.get('jobExcerpt','')} "
                          f"{' '.join(j.get('jobIndustry', []) or [])}",
             })
@@ -318,6 +343,7 @@ def fetch_himalayas(query):
                 "salary": sal,
                 "location": ", ".join(locs) if locs else "Remote",
                 "posted_ts": _to_ts(j.get("pubDate")),
+                "_desc": j.get("description", ""),
                 "_text": f"{j.get('title','')} {j.get('description','')} "
                          f"{' '.join(j.get('categories', []) or [])}",
             })
@@ -354,6 +380,7 @@ def fetch_wwr(query):
                     "salary": "",
                     "location": region,
                     "posted_ts": _to_ts(item.findtext("pubDate")),
+                    "_desc": item.findtext("description", ""),
                     "_text": f"{title} {item.findtext('description','')}",
                 })
         except Exception as e:
@@ -380,6 +407,7 @@ def fetch_arbeitnow(query):
                 "salary": "",
                 "location": j.get("location") or "Remote",
                 "posted_ts": _to_ts(j.get("created_at")),
+                "_desc": j.get("description", ""),
                 "_text": f"{j.get('title','')} {j.get('description','')}",
             })
     except Exception as e:
@@ -690,6 +718,7 @@ def fetch_jsearch(query):
             "location": loc,
             "posted_ts": _to_ts(j.get("job_posted_at_timestamp")
                                 or j.get("job_posted_at_datetime_utc")),
+            "_desc": desc,
             "_text": f"{j.get('job_title','')} {desc}",
         })
     return out
@@ -767,16 +796,17 @@ def run_search(con, query, max_age_days=MAX_AGE_DAYS_DEFAULT,
     for j in filtered:
         # Skills desde el texto completo (título + descripción + tags de la fuente).
         skills = extract_skills_str(j.get("_text") or j.get("title", ""))
+        description = _excerpt(j)
         title, company, location = (_clean(j["title"]), _clean(j.get("company")),
                                     _clean(j.get("location")))
         cur = con.execute(
             """INSERT OR IGNORE INTO jobs
                (search_id,title,company,url,source,salary,location,
-                date_posted,posted_ts,skills,is_new)
-               VALUES(?,?,?,?,?,?,?,?,?,?,1)""",
+                date_posted,posted_ts,skills,description,is_new)
+               VALUES(?,?,?,?,?,?,?,?,?,?,?,1)""",
             (search_id, title, company, j["url"],
              j["source"], j.get("salary", ""), location,
-             _fmt_date(j.get("posted_ts")), j.get("posted_ts"), skills),
+             _fmt_date(j.get("posted_ts")), j.get("posted_ts"), skills, description),
         )
         if cur.rowcount:
             inserted += 1
@@ -784,6 +814,7 @@ def run_search(con, query, max_age_days=MAX_AGE_DAYS_DEFAULT,
                 "title": title, "company": company, "url": j["url"],
                 "source": j["source"], "salary": j.get("salary", ""),
                 "location": location, "skills": skills,
+                "description": description,
             })
     con.commit()
 

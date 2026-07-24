@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+{% block title %}Postulaciones · JobHunter{% endblock %}
+{% block body %}
+
+<style>
+.sankey-wrap{overflow-x:auto}
+.sankey{min-width:640px}
+.sk-link{opacity:.42;transition:opacity .15s}
+.sk-link:hover{opacity:.85}
+.sk-node rect{rx:3}
+.sk-lbl{font-size:11.5px;fill:var(--txt);font-weight:600}
+.sk-val{font-size:10.5px;fill:var(--mut)}
+.kpi{background:var(--card2);border-radius:10px;padding:13px 15px}
+.kpi .n{font-size:23px;font-weight:700;line-height:1.1}
+.kpi .l{color:var(--mut);font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;margin-top:4px}
+.app-row{display:grid;grid-template-columns:1fr auto;gap:6px 14px;align-items:center;
+  padding:11px 14px;border-bottom:1px solid var(--line)}
+.app-row:last-child{border-bottom:none}
+.app-t{font-weight:600;font-size:14.5px}
+.app-t a{color:var(--txt)} .app-t a:hover{color:var(--accent)}
+.app-m{font-size:12px;color:var(--mut)}
+.st-pill{display:inline-flex;align-items:center;gap:5px;border-radius:20px;padding:3px 11px;
+  font-size:12px;font-weight:700;border:1px solid currentColor}
+.tabs2{display:flex;gap:6px}
+.tabs2 a{border:1px solid var(--line);border-radius:8px;padding:5px 12px;font-size:13px;color:var(--mut)}
+.tabs2 a.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+</style>
+
+<div class="row" style="justify-content:space-between;align-items:center;margin-bottom:6px">
+  <h2 style="margin:0">Postulaciones</h2>
+  <div class="tabs2">
+    <a href="{{ url_for('applications_page', view='activas') }}" class="{{ 'on' if view=='activas' }}">En curso</a>
+    <a href="{{ url_for('applications_page', view='cerradas') }}" class="{{ 'on' if view=='cerradas' }}">Cerradas</a>
+    <a href="{{ url_for('applications_page', view='todas') }}" class="{{ 'on' if view=='todas' }}">Todas</a>
+  </div>
+</div>
+<p class="muted" style="margin-top:0">Tu embudo real: en qué punto está cada oferta y cuántas avanzan de una etapa a la siguiente. Marca el estado desde <a href="{{ url_for('index') }}">Empleos</a> o aquí mismo.</p>
+
+{% set t = funnel.totals %}
+<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));margin-bottom:16px">
+  <div class="kpi"><div class="n">{{ t.postuladas }}</div><div class="l">Postuladas</div></div>
+  <div class="kpi"><div class="n" style="color:var(--accent)">{{ t.tasa_respuesta }}%</div><div class="l">Tasa respuesta</div></div>
+  <div class="kpi"><div class="n" style="color:#a78bfa">{{ t.entrevistas }}</div><div class="l">Entrevistas técn.</div></div>
+  <div class="kpi"><div class="n" style="color:var(--accent2)">{{ t.ofertas }}</div><div class="l">Ofertas</div></div>
+  <div class="kpi"><div class="n" style="color:var(--warn)">{{ t.ghosteadas }}</div><div class="l">Sin respuesta</div></div>
+  <div class="kpi"><div class="n" style="color:#ef4444">{{ t.rechazadas }}</div><div class="l">Rechazos</div></div>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0">Embudo</h3>
+  {% if funnel.nodes %}
+  <div class="sankey-wrap"><svg id="sankey" class="sankey" role="img"
+       aria-label="Diagrama de flujo de tus postulaciones a través del embudo"></svg></div>
+  <p class="muted" style="font-size:12px;margin:10px 0 0">El grosor de cada cinta es el número de postulaciones. Las cintas de color salen de la etapa donde se quedaron.</p>
+  {% else %}
+  <p class="muted" style="margin:0">Aún no sigues ninguna postulación. En <a href="{{ url_for('index') }}">Empleos</a>, marca una oferta como <b>Postulado</b> y aquí verás el embudo.</p>
+  {% endif %}
+</div>
+
+{% if by_source %}
+<div class="card">
+  <h3 style="margin-top:0">¿Qué bolsa te responde?</h3>
+  <div class="tbl-wrap" style="overflow-x:auto">
+    <table style="width:100%;font-size:13.5px">
+      <thead><tr>
+        <th style="text-align:left;padding:8px 10px;color:var(--mut);font-size:11px;text-transform:uppercase">Fuente</th>
+        <th style="text-align:right;padding:8px 10px;color:var(--mut);font-size:11px;text-transform:uppercase">Postuladas</th>
+        <th style="text-align:right;padding:8px 10px;color:var(--mut);font-size:11px;text-transform:uppercase">Respuestas</th>
+        <th style="text-align:right;padding:8px 10px;color:var(--mut);font-size:11px;text-transform:uppercase">Entrevistas</th>
+        <th style="text-align:right;padding:8px 10px;color:var(--mut);font-size:11px;text-transform:uppercase">Tasa</th>
+      </tr></thead>
+      <tbody>
+      {% for s in by_source %}
+        <tr style="border-top:1px solid var(--line)">
+          <td style="padding:8px 10px">{{ s.source }}</td>
+          <td style="padding:8px 10px;text-align:right">{{ s.postuladas }}</td>
+          <td style="padding:8px 10px;text-align:right">{{ s.respuestas }}</td>
+          <td style="padding:8px 10px;text-align:right">{{ s.entrevistas }}</td>
+          <td style="padding:8px 10px;text-align:right;font-weight:700;color:{{ 'var(--accent2)' if s.tasa>=30 else ('var(--accent)' if s.tasa>0 else 'var(--mut)') }}">{{ s.tasa }}%</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<div class="card">
+  <h3 style="margin-top:0">{{ apps|length }} postulación(es) {{ {'activas':'en curso','cerradas':'cerradas','todas':''}[view] }}</h3>
+  {% for a in apps %}
+  <div class="app-row">
+    <div>
+      <div class="app-t"><a href="{{ a.url }}" target="_blank" rel="noopener">{{ a.title }}</a></div>
+      <div class="app-m">
+        {{ a.company or '—' }} · 🌐 {{ a.source }}
+        {% if a.applied_at %} · postulado {{ a.applied_at[:10] }}{% endif %}
+        {% if a.match_score is not none %} · ✦ {{ a.match_score }}%{% endif %}
+      </div>
+      {% if a.notes %}<div class="app-m" style="margin-top:3px">📝 {{ a.notes }}</div>{% endif %}
+    </div>
+    <form method="post" action="{{ url_for('job_status', job_id=a.job_id) }}" class="row" style="gap:6px">
+      <span class="st-pill" style="color:{{ a.meta.color }}">{{ a.meta.icon }} {{ a.meta.label }}</span>
+      <select name="status" onchange="this.form.submit()" style="padding:5px 8px;font-size:12.5px">
+        <option value="">Cambiar…</option>
+        {% for s in stages %}<option value="{{ s.key }}" {{ 'disabled' if s.key==a.status }}>{{ s.icon }} {{ s.label }}</option>{% endfor %}
+        <option disabled>──────</option>
+        {% for o in outcomes %}<option value="{{ o.key }}" {{ 'disabled' if o.key==a.status }}>{{ o.icon }} {{ o.label }}</option>{% endfor %}
+        <option disabled>──────</option>
+        <option value="__none__">🗑 Quitar del seguimiento</option>
+      </select>
+    </form>
+  </div>
+  {% else %}
+  <p class="muted" style="margin:0">Nada por aquí todavía.</p>
+  {% endfor %}
+</div>
+
+<script>
+// Sankey dibujado a mano en SVG: sin librerías externas (la Pi trabaja offline).
+(function(){
+  var DATA = {{ funnel|tojson }};
+  var svg = document.getElementById('sankey');
+  if(!svg || !DATA.nodes.length) return;
+
+  var W = Math.max(640, svg.parentNode.clientWidth || 720),
+      NW = 13, GAP = 16, PAD = {t:16, b:16, l:8, r:8};
+
+  // Columnas: las etapas van en su índice; las salidas, una columna después de
+  // la última etapa desde la que se cae (así las cintas nunca van hacia atrás).
+  var stageCols = DATA.nodes.filter(function(n){ return n.col !== null; });
+  var maxCol = stageCols.reduce(function(m,n){ return Math.max(m, n.col); }, 0);
+  DATA.nodes.forEach(function(n, i){
+    if(n.col === null){
+      var from = DATA.links.filter(function(l){ return l.target === i; })
+                           .map(function(l){ return DATA.nodes[l.source].col; });
+      n.col = (from.length ? Math.max.apply(null, from) : maxCol) + 1;
+    }
+  });
+  var cols = Math.max.apply(null, DATA.nodes.map(function(n){ return n.col; })) + 1;
+  var colX = function(c){ return PAD.l + c * ((W - PAD.l - PAD.r - NW) / Math.max(1, cols-1)); };
+
+  // Altura: escala para que la columna más cargada quepa
+  var byCol = {};
+  DATA.nodes.forEach(function(n){ (byCol[n.col] = byCol[n.col] || []).push(n); });
+  var maxSum = 0;
+  Object.keys(byCol).forEach(function(c){
+    var s = byCol[c].reduce(function(a,n){ return a + n.value; }, 0);
+    maxSum = Math.max(maxSum, s);
+  });
+  var maxCount = Math.max.apply(null, Object.keys(byCol).map(function(c){ return byCol[c].length; }));
+  var H = 300, unit = (H - PAD.t - PAD.b - (maxCount-1)*GAP) / Math.max(1, maxSum);
+  unit = Math.max(unit, 2.2);
+  H = PAD.t + PAD.b + maxSum*unit + (maxCount-1)*GAP;
+
+  Object.keys(byCol).forEach(function(c){
+    var arr = byCol[c].sort(function(a,b){ return b.value - a.value; }), y = PAD.t;
+    arr.forEach(function(n){ n.h = Math.max(3, n.value*unit); n.x = colX(n.col); n.y = y; y += n.h + GAP; });
+  });
+
+  svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+  svg.setAttribute('width', '100%');
+  svg.setAttribute('height', H);
+
+  var NS='http://www.w3.org/2000/svg', out=[];
+  var offOut={}, offIn={};
+  DATA.links.sort(function(a,b){ return a.target - b.target; }).forEach(function(l){
+    var s=DATA.nodes[l.source], t=DATA.nodes[l.target], w=Math.max(1.5, l.value*unit);
+    var y0 = s.y + (offOut[l.source] = (offOut[l.source]||0)) ; offOut[l.source] += w;
+    var y1 = t.y + (offIn[l.target] = (offIn[l.target]||0)) ;  offIn[l.target]  += w;
+    var x0=s.x+NW, x1=t.x, mx=(x0+x1)/2;
+    var d='M'+x0+','+y0+'C'+mx+','+y0+' '+mx+','+y1+' '+x1+','+y1+
+          'L'+x1+','+(y1+w)+'C'+mx+','+(y1+w)+' '+mx+','+(y0+w)+' '+x0+','+(y0+w)+'Z';
+    out.push('<path class="sk-link" d="'+d+'" fill="'+l.color+'"><title>'+l.value+'</title></path>');
+  });
+  DATA.nodes.forEach(function(n){
+    out.push('<g class="sk-node"><rect x="'+n.x+'" y="'+n.y+'" width="'+NW+'" height="'+n.h+
+             '" fill="'+n.color+'"><title>'+n.label+': '+n.value+'</title></rect></g>');
+    var anchor = n.x > W*0.62 ? 'end' : 'start';
+    var tx = anchor==='end' ? n.x-6 : n.x+NW+6;
+    var ty = n.y + n.h/2;
+    out.push('<text class="sk-lbl" x="'+tx+'" y="'+(ty-1)+'" text-anchor="'+anchor+'">'+n.label+'</text>');
+    out.push('<text class="sk-val" x="'+tx+'" y="'+(ty+12)+'" text-anchor="'+anchor+'">'+n.value+'</text>');
+  });
+  svg.innerHTML = out.join('');
+})();
+</script>
+{% endblock %}
