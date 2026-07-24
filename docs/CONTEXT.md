@@ -46,7 +46,7 @@ job-hunter/
 │   ├── __init__.py
 │   ├── paths.py        # Rutas del proyecto en un solo sitio (ROOT, data/, docs/)
 │   ├── app.py          # Servidor Flask: rutas, filtros Jinja, planificador
-│   ├── db.py           # Esquema SQLite (9 tablas) + carga de .env (fallback)
+│   ├── db.py           # Esquema SQLite (11 tablas) + carga de .env (fallback)
 │   ├── fetcher.py      # 12 fuentes, filtros (título/ubicación/fecha), orquestación
 │   ├── skills.py       # Extracción de skills técnicas del texto (diccionario curado)
 │   ├── llm.py          # Capa de proveedor de IA: enruta a Claude o Gemini
@@ -57,7 +57,7 @@ job-hunter/
 │   ├── cv.py           # CV + IA: perfil, match, ¿encajo?, carta, CV nuevo,
 │   │                   #   CV a medida por vacante (ATS) + blindaje anti-alucinación
 │   ├── cvpdf.py        # Renderiza los CVs a PDF (fpdf2 + DejaVu, ≤2 págs)
-│   ├── templates/      # 12 vistas Jinja2
+│   ├── templates/      # 13 vistas Jinja2
 │   └── static/
 ├── data/               # RUNTIME, gitignored: jobs.db, secret.key, logs/, search.log
 ├── docs/               # CONTEXT.md + mapas (architecture.json/html, workflow.html)
@@ -353,6 +353,8 @@ Empleos `/` · Buscar ahora `/run` · Búsquedas `/searches` · **Configuración
 `/settings` (proveedor de IA + claves + notificaciones/SMTP; POST: `set_provider`,
 `set_apikey`/`clear_apikey`, `set_notify`, `clear_smtp_pass`, `clear_telegram_token`,
 `test_notify`, `set_schedule` [horarios del planificador]) ·
+**Postulaciones** `/applications` (embudo Sankey + métricas; POST
+`/jobs/<id>/status` y `/jobs/<id>/note`) ·
 **Logs** `/logs` (consola en vivo; + `/api/logs`, `/logs/clear`, `/logs/download`) ·
 Notificaciones `/notifications` · Compañías `/companies` (+ `/companies/summary`,
 `/companies/glassdoor-name`, `/companies/block`, `/companies/unblock`) ·

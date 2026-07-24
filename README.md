@@ -18,7 +18,7 @@ job-hunter/
 ├── jobhunter/          # el paquete de la aplicación
 │   ├── app.py          # servidor Flask: rutas, filtros Jinja, planificador
 │   ├── paths.py        # rutas del proyecto resueltas en un solo sitio
-│   ├── db.py           # esquema SQLite (9 tablas) + carga del .env
+│   ├── db.py           # esquema SQLite (11 tablas) + carga del .env
 │   ├── fetcher.py      # 12 fuentes de empleo, filtros y orquestación
 │   ├── skills.py       # extracción de skills técnicas del texto
 │   ├── llm.py          # router de IA: Claude o Gemini
@@ -26,9 +26,10 @@ job-hunter/
 │   ├── cvpdf.py        # renderiza los CVs a PDF (fpdf2)
 │   ├── reviews.py      # resumen de reputación de empresas
 │   ├── notifier.py     # notificaciones (email SMTP + Telegram)
+│   ├── tracker.py      # seguimiento de postulaciones: estados, embudo y métricas
 │   ├── keystore.py     # secretos cifrados (Fernet)
 │   ├── applog.py       # log central rotativo
-│   ├── templates/      # 12 vistas Jinja2
+│   ├── templates/      # 13 vistas Jinja2
 │   └── static/
 ├── data/               # runtime, NO versionado: jobs.db, secret.key, logs/
 ├── docs/               # CONTEXT.md + mapas (architecture.*, workflow.html)
@@ -51,12 +52,16 @@ cp .env.example .env        # rellena las claves que uses
 ```
 
 ## Páginas
-- **Empleos** — lo encontrado con fuente, salario, fecha y skills; filtros por
-  texto/búsqueda/fuente/ventana; % de afinidad con tu CV; por oferta: *¿encajo
-  aquí?*, *carta* y **CV a medida** (ATS).
+- **Empleos** — lo encontrado con fuente, salario, fecha, skills y un extracto de
+  la **descripción**; filtros por texto/búsqueda/fuente/ventana; % de afinidad con
+  tu CV; por oferta: *¿encajo aquí?*, *carta*, **CV a medida** (ATS) y el selector
+  de **estado de tu postulación**.
 - **Compañías** — empleadores reales (no las bolsas). La píldora de ofertas
   despliega sus vacantes con enlace directo a la postulación. Glassdoor y resumen
   de reputación por IA. Se pueden **bloquear** (subsección *Bloqueos*).
+- **Postulaciones** — tu embudo real en un **diagrama Sankey**: cuántas enviaste,
+  cuántas llegaron a entrevista técnica, cuáles acabaron en oferta, en rechazo o
+  sin respuesta. Con tasas de respuesta y **qué bolsa te contesta de verdad**.
 - **Mi CV** — sube el CV y la IA extrae tu perfil, puntúa empleos, mejora el
   currículum y **genera uno nuevo en PDF** (es la referencia del sistema).
 - **Búsquedas** — términos, palabras clave de título, ubicación, ventana, RapidAPI.
@@ -93,6 +98,19 @@ devuelva dicts con `title/company/url/source/salary/location/posted_ts` y súmal
 `SOURCES` (para RapidAPI, usa el helper `_rapidapi_get()` y añádela también a
 `RAPIDAPI_SOURCES`). Los filtros se aplican por igual a todas.
 
+## Seguimiento de postulaciones
+
+Marca el estado de cada oferta desde su tarjeta en **Empleos** (se guarda sin
+recargar). Las etapas son **interesado → postulado → contacto RR. HH. → entrevista
+técnica → entrevista final → oferta → aceptada**, y desde cualquiera de ellas
+puedes cerrar con **rechazado**, **sin respuesta** o **me retiré**.
+
+En **Postulaciones** verás el embudo en un Sankey (dibujado sin librerías externas),
+los KPIs y una tabla de rendimiento por bolsa. Se guarda el **historial completo**
+de transiciones, no solo el estado actual: así el embudo sabe que una candidatura
+rechazada tras la entrevista técnica sí llegó a esa etapa. Si te equivocas al
+marcar, basta con volver atrás: la última etapa marcada es la que manda.
+
 ## Filtros
 - El **título** debe contener alguna palabra clave del rol.
 - **Ubicación** según el modo (mundial / América / sin filtro).
@@ -127,6 +145,8 @@ tail -f data/search.log                              # log de búsquedas
 
 ## Datos
 
-SQLite en `data/jobs.db` (WAL), 9 tablas: `searches`, `jobs`, `notifications`,
+SQLite en `data/jobs.db` (WAL), 11 tablas: `searches`, `jobs`, `notifications`,
 `settings`, `blocked_companies`, `company_reviews`, `profile`, `job_matches`,
-`tailored_cvs`. El CV se guarda **solo en la Pi**; "Borrar perfil" lo elimina.
+`tailored_cvs`, `applications` (estado actual de cada postulación) y
+`application_events` (historial de transiciones, del que sale el embudo).
+El CV se guarda **solo en la Pi**; "Borrar perfil" lo elimina.

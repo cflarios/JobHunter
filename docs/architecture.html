@@ -178,11 +178,11 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
     Con IA (proveedor seleccionable, Claude por defecto): resume la reputación de cada empresa y empareja tu CV
     con las ofertas (afinidad, ¿encajo?, carta, mejora y CV nuevo en PDF). Enfocado en DevOps/SRE remoto desde Colombia, ampliable a cualquier rol.</p>
     <div class="chips">
-      <div class="chip"><div class="n">11</div><div class="l">Fuentes</div></div>
+      <div class="chip"><div class="n">12</div><div class="l">Fuentes</div></div>
       <div class="chip"><div class="n">11</div><div class="l">Tablas SQLite</div></div>
-      <div class="chip"><div class="n">37</div><div class="l">Rutas HTTP</div></div>
+      <div class="chip"><div class="n">39</div><div class="l">Rutas HTTP</div></div>
       <div class="chip"><div class="n">2</div><div class="l">Canales de aviso</div></div>
-      <div class="chip"><div class="n">~2.9k</div><div class="l">Líneas de código</div></div>
+      <div class="chip"><div class="n">~4.5k</div><div class="l">Líneas de código</div></div>
       <div class="chip"><div class="n">6</div><div class="l">Funciones IA</div></div>
     </div>
     <a class="wfbtn" id="wfbtn" href="/workflow">
@@ -290,6 +290,7 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
           <div class="nodes">
             <div class="node"><b>Empleos</b><span class="d">lista + filtros + barra "empleos nuevos" (sondeo 45s)</span></div>
             <div class="node"><b>Compañías</b><span class="d">empleadores + Glassdoor + resumen AJAX · despliega sus ofertas con enlace a la postulación</span></div>
+            <div class="node"><b>Postulaciones</b><span class="d">embudo Sankey + tasas de respuesta · el estado se marca desde Empleos</span></div>
             <div class="node"><b>Configuración</b><span class="d">IA + claves + notificaciones + horarios de búsqueda</span></div>
             <div class="node"><b>Logs</b><span class="d">consola en vivo: app, búsquedas y journald · filtros y modo tail</span></div>
             <div class="node"><b>Notificaciones</b><span class="d">badge sondea /api/unread cada 30s</span></div>
@@ -329,6 +330,22 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
     </div>
 
     <div class="branch">
+      <div class="stage" data-c="green" style="margin-bottom:0">
+        <div class="num">↳</div>
+        <div class="stage-card">
+          <div class="stage-head"><span class="stage-title">Rama · Seguimiento de postulaciones</span><span class="stage-tag">tracker.py</span></div>
+          <div class="nodes">
+            <div class="node"><b>Marcar estado</b><span class="d">selector en cada empleo → POST /jobs/{id}/status (AJAX, sin recargar)</span></div>
+            <div class="node"><b>applications</b><span class="d">estado ACTUAL de cada postulación</span></div>
+            <div class="node"><b>application_events</b><span class="d">HISTORIAL de transiciones: sin él el embudo no sabría por dónde pasó</span></div>
+            <div class="node"><b>tracker.funnel()</b><span class="d">reproduce el historial en orden → nodos y flujos del embudo</span></div>
+            <div class="node"><b>Sankey SVG</b><span class="d">dibujado a mano, sin librerías (la Pi trabaja offline)</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="branch">
       <div class="stage" data-c="violet" style="margin-bottom:0">
         <div class="num">↳</div>
         <div class="stage-card">
@@ -352,12 +369,14 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
       <tbody>
         <tr><td class="mono">searches</td><td class="cols"><b>id</b>, query, title_keywords, max_age_days, active, created_at</td></tr>
         <tr><td class="mono">blocked_companies</td><td class="cols"><b>name ·PK NOCASE</b>, created_at</td></tr>
-        <tr><td class="mono">jobs</td><td class="cols"><b>id</b>, <span class="fk">search_id→searches</span>, title, company, <span class="pk">url ·unique</span>, source, salary, location, date_posted, posted_ts, skills, found_at, is_new</td></tr>
+        <tr><td class="mono">jobs</td><td class="cols"><b>id</b>, <span class="fk">search_id→searches</span>, title, company, <span class="pk">url ·unique</span>, source, salary, location, date_posted, posted_ts, skills, <b>description</b> <span style="color:var(--faint)">·extracto de la oferta</span>, found_at, is_new</td></tr>
         <tr><td class="mono">notifications</td><td class="cols"><b>id</b>, message, created_at, read <span style="color:var(--faint)">· avisos in-app</span></td></tr>
         <tr><td class="mono">settings</td><td class="cols"><b>key</b>, value <span style="color:var(--faint)">· location_mode, ai_provider, search_times, notify_*/smtp_*/telegram_*, apikey_*/secret_* (cifrados)…</span></td></tr>
         <tr><td class="mono">company_reviews</td><td class="cols"><b>company</b>, summary, resolved_name, glassdoor_url, status, generated_at</td></tr>
         <tr><td class="mono">profile</td><td class="cols"><b>id ·=1</b>, cv_text, role, seniority, years, skills, summary, suggested_keywords, feedback, rewrite, generated_cv, updated_at</td></tr>
         <tr><td class="mono">job_matches</td><td class="cols"><b><span class="fk">job_id→jobs</span></b>, score, reason, fit_detail, updated_at</td></tr>
+        <tr><td class="mono">applications</td><td class="cols"><b><span class="fk">job_id→jobs ·PK</span></b>, status, applied_at, closed_at, notes, created_at, updated_at <span style="color:var(--faint)">·estado ACTUAL</span></td></tr>
+        <tr><td class="mono">application_events</td><td class="cols"><b>id</b>, <span class="fk">job_id→jobs</span>, from_status, to_status, note, created_at <span style="color:var(--faint)">·HISTORIAL: de aquí sale el embudo</span></td></tr>
         <tr><td class="mono">tailored_cvs</td><td class="cols"><b><span class="fk">job_id→jobs ·PK</span></b>, lang, cv <span style="color:var(--faint)">·JSON del CV adaptado</span>, notes, ats_score, job_desc, updated_at</td></tr>
       </tbody>
     </table></div>
@@ -378,6 +397,8 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
         <tr><td class="path">/companies</td><td class="method">GET</td><td>Empleadores reales agregados del campo company</td></tr>
         <tr><td class="path">/companies/summary</td><td class="method">POST</td><td>Genera/cachea resumen de opiniones (JSON si AJAX)</td></tr>
         <tr><td class="path">/companies/block · /unblock</td><td class="method">POST</td><td>Blacklist: bloquear (borra sus ofertas) / desbloquear empresa</td></tr>
+        <tr><td class="path">/applications</td><td class="method">GET</td><td>Postulaciones: embudo Sankey, métricas, rendimiento por bolsa y listado</td></tr>
+        <tr><td class="path">/jobs/&lt;id&gt;/status</td><td class="method">POST</td><td>Cambia el estado de seguimiento de una oferta (AJAX)</td></tr>
         <tr><td class="path">/blacklist</td><td class="method">GET</td><td>Bloqueos: blacklist de compañías con alta manual</td></tr>
         <tr><td class="path">/cv</td><td class="method">GET</td><td>Mi CV: subir, perfil, afinidad, mejora</td></tr>
         <tr><td class="path">/cv/analyze</td><td class="method">POST</td><td>Analiza el CV (PDF/texto) → perfil</td></tr>
@@ -431,6 +452,19 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
   </section>
 
   <section class="blk">
+    <h2 class="sec">Seguimiento de postulaciones</h2>
+    <p class="muted" style="font-size:12.5px;margin:-4px 0 12px">Etapas: <b>interesado → postulado → contacto RR. HH. → entrevista técnica → entrevista final → oferta → aceptada</b>, con salidas desde cualquier punto (rechazado, sin respuesta, me retiré).</p>
+    <div class="cards">
+      <div class="card"><h3>Dos tablas, a propósito</h3><p><span class="k">applications</span> guarda el estado actual y <span class="k">application_events</span> el historial. Sin el historial el embudo mentiría: una postulación rechazada tras la entrevista técnica no contaría como que llegó a la técnica.</p></div>
+      <div class="card"><h3>Se reproduce el historial</h3><p><span class="k">_reached()</span> recorre los eventos <b>en orden</b>: una etapa fija la posición (la última manda, así que corregir hacia atrás surte efecto) y un desenlace solo <b>sube</b> hasta su mínimo implícito.</p></div>
+      <div class="card"><h3>Desenlaces en seco</h3><p><span class="k">IMPLIED_MIN</span> · marcar «rechazado» sin pasar por «postulado» hacía desaparecer la oferta del embudo. Ahora se infiere: no te pueden rechazar una candidatura que nunca enviaste.</p></div>
+      <div class="card"><h3>Nodo «En curso»</h3><p>Las que esperan en una etapa. Sin él el Sankey perdía flujo (llegaban 8, salían 7) y parecía descuadrado. Con él <b>cada etapa cumple</b> llegaron = avanzan + caen + esperan.</p></div>
+      <div class="card"><h3>Métricas que deciden</h3><p>Tasa de respuesta, de entrevista y de oferta, más el <b>rendimiento por bolsa</b>: responde a qué fuente te contesta de verdad y dónde merece la pena invertir el tiempo.</p></div>
+      <div class="card"><h3>Extracto de la oferta</h3><p><span class="k">jobs.description</span> · se guarda al ingerir (<span class="k">fetcher._excerpt()</span>, ≤4000 chars). Alimenta el «¿encajo?» y el CV a medida, que antes dependían solo del título.</p></div>
+    </div>
+  </section>
+
+  <section class="blk">
     <h2 class="sec">Despliegue — systemd + planificador in-app</h2>
     <div class="cards">
       <div class="card"><h3>jobhunter-web.service</h3><p><span class="k">.venv/bin/python run.py</span> · puerto 8080 · Restart=on-failure · arranca en el boot. <b>Aloja el planificador in-app</b>.</p></div>
@@ -479,14 +513,15 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
     "Telegram Bot API"
   ],
   "metrics": {
-    "sources": 11,
+    "sources": 12,
     "db_tables": 11,
-    "http_routes": 37,
-    "python_lines": 2900,
+    "http_routes": 39,
+    "python_lines": 4468,
     "template_files": 13,
     "systemd_units": 3,
     "ai_features": 3,
-    "notify_channels": 2
+    "notify_channels": 2,
+    "tracking_stages": 7
   },
   "layers": [
     {
@@ -971,6 +1006,11 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
       "path": "/jobs/<id>/status",
       "method": "POST",
       "purpose": "Cambia el estado de seguimiento de una oferta (AJAX)"
+    },
+    {
+      "path": "/jobs/<id>/note",
+      "method": "POST",
+      "purpose": "Guarda una nota en la postulación"
     }
   ],
   "deployment": {

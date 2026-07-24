@@ -13,14 +13,15 @@
     "Telegram Bot API"
   ],
   "metrics": {
-    "sources": 11,
+    "sources": 12,
     "db_tables": 11,
-    "http_routes": 37,
-    "python_lines": 2900,
+    "http_routes": 39,
+    "python_lines": 4468,
     "template_files": 13,
     "systemd_units": 3,
     "ai_features": 3,
-    "notify_channels": 2
+    "notify_channels": 2,
+    "tracking_stages": 7
   },
   "layers": [
     {
@@ -505,6 +506,11 @@
       "path": "/jobs/<id>/status",
       "method": "POST",
       "purpose": "Cambia el estado de seguimiento de una oferta (AJAX)"
+    },
+    {
+      "path": "/jobs/<id>/note",
+      "method": "POST",
+      "purpose": "Guarda una nota en la postulación"
     }
   ],
   "deployment": {

@@ -156,6 +156,10 @@
     {id:'r_cv',    c:5, k:'violet',t:'Mi CV',         s:'/cv'},
     {id:'r_set',   c:5, k:'violet',t:'Configuración', s:'/settings', tag:'config'},
     {id:'r_logs',  c:5, k:'violet',t:'Logs',          s:'/logs · consola', tag:'obs'},
+    {id:'r_apps',  c:5, k:'violet',t:'Postulaciones', s:'/applications', tag:'embudo'},
+    {id:'tracker', c:6, k:'green', t:'tracker.py',    s:'estados + embudo', tag:'track'},
+    {id:'t_apps',  c:4, k:'green', t:'applications',  s:'estado actual'},
+    {id:'t_appev', c:4, k:'green', t:'application_events', s:'historial'},
     {id:'applog',  c:4, k:'green', t:'applog',        s:'jobhunter.log', tag:'log'},
     {id:'notifier',c:6, k:'violet',t:'notifier.py',   s:'avisos · inmediato/diario', tag:'notif'},
     {id:'tailor',  c:6, k:'amber', t:'tailor_cv()',    s:'CV a medida ATS', tag:'ats'},
@@ -201,6 +205,11 @@
     // --- Observabilidad: todo escribe al log central, la UI lo lee ---
     ['run_all','applog','config'],['notifier','applog','config'],['flask','applog','config'],
     ['applog','r_logs'],['flask','r_logs'],['r_logs','browser','poll'],
+    // --- Seguimiento de postulaciones: el estado se marca desde Empleos ---
+    ['r_index','tracker','ext'],['browser','tracker','ext'],
+    ['tracker','t_apps'],['tracker','t_appev'],
+    ['t_apps','tracker','config'],['t_appev','tracker','config'],['t_jobs','tracker','config'],
+    ['flask','r_apps'],['tracker','r_apps'],['r_apps','browser'],
     // --- CV a medida por vacante (ATS) ---
     ['r_index','tailor','ext'],['browser','tailor','ext'],
     ['t_prof','tailor','config'],['t_jobs','tailor','config'],
