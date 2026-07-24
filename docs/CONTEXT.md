@@ -414,6 +414,19 @@ oferta a partir de los eventos).
   parece un error de cuadre; en realidad son postulaciones esperando en esa etapa.
   Se calcula con el estado actual y hace que **cada etapa cuadre**:
   `llegaron = avanzan + caen + esperan`. Verificado con un escenario de 9 ofertas.
+- **`IMPLIED_MIN` — etapa mínima que implica un desenlace.** Bug real detectado en
+  uso: si marcas una oferta directamente como `rechazado` o `ghosteado` **sin pasar
+  antes por `postulado`**, `_reached()` no la registraba (el desenlace no es una
+  etapa) y la oferta **desaparecía por completo del embudo**. Ahora se infiere la
+  etapa mínima al leer: rechazado/ghosteado ⇒ `postulado` (no te pueden rechazar ni
+  ignorar una candidatura que nunca enviaste), retirada ⇒ `interesado`. Se hace en
+  **lectura**, no escribiendo eventos falsos en el historial, y con `max()` para no
+  pisar un recorrido más avanzado ya registrado.
+- **Los desenlaces van todos en la ÚLTIMA columna** del Sankey. Colocarlos justo
+  detrás de la etapa de la que caen los dejaba mezclados con una etapa activa en la
+  misma columna (p. ej. «Rechazado» junto a «Contacto RR. HH.») y no se distinguía
+  el embudo de sus salidas. Con la columna final se lee: izquierda = recorrido,
+  derecha = dónde acabó cada una, y la **primera columna cuadra con la última**.
 - **Sankey dibujado a mano en SVG** (`applications.html`), sin librerías externas:
   la Pi trabaja offline y el CSP de los artefactos bloquea CDNs. Nodos como barras
   por columna, cintas de Bézier con grosor proporcional. Las salidas se colocan una

@@ -142,22 +142,38 @@ def applications(status=None):
     return rows
 
 
-def _reached(con):
-    """Etapa MÁXIMA alcanzada por cada postulación, según el historial.
+# Etapa MÍNIMA que un desenlace da por supuesta. Si marcas «rechazado» o «sin
+# respuesta», es porque llegaste a postular: no te pueden rechazar ni ignorar una
+# candidatura que nunca enviaste. «Me retiré», en cambio, puede pasar estando solo
+# interesado. Sin esto, marcar el desenlace directamente (sin pasar antes por
+# «postulado») hacía que la oferta desapareciera del embudo.
+IMPLIED_MIN = {
+    "rechazado": "postulado",
+    "ghosteado": "postulado",
+    "retirada": "interesado",
+}
 
-    Se mira el historial y no el estado actual: una postulación rechazada tras la
-    entrevista técnica sí «alcanzó» la técnica, y así debe contar en el embudo.
+
+def _reached(con):
+    """Etapa MÁXIMA alcanzada por cada postulación.
+
+    Se mira el historial y no solo el estado actual: una postulación rechazada tras
+    la entrevista técnica sí «alcanzó» la técnica, y así debe contar en el embudo.
+    A eso se le suma la etapa mínima que implica el desenlace (ver IMPLIED_MIN), de
+    modo que un «rechazado» marcado a pelo cuente igualmente como postulación.
     """
     reached = {}
+
+    def bump(job_id, i):
+        if i is not None:
+            reached[job_id] = max(reached.get(job_id, -1), i)
+
     for r in con.execute("SELECT job_id, to_status FROM application_events ORDER BY id"):
-        i = stage_index(r["to_status"])
-        if i is not None:
-            reached[r["job_id"]] = max(reached.get(r["job_id"], -1), i)
-    # Postulaciones creadas sin eventos (por si acaso): usa el estado actual.
+        bump(r["job_id"], stage_index(r["to_status"]))
+        bump(r["job_id"], stage_index(IMPLIED_MIN.get(r["to_status"], "")))
     for r in con.execute("SELECT job_id, status FROM applications"):
-        i = stage_index(r["status"])
-        if i is not None:
-            reached[r["job_id"]] = max(reached.get(r["job_id"], -1), i)
+        bump(r["job_id"], stage_index(r["status"]))
+        bump(r["job_id"], stage_index(IMPLIED_MIN.get(r["status"], "")))
     return reached
 
 

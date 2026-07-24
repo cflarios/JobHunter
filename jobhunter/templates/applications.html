@@ -125,17 +125,14 @@
   var W = Math.max(640, svg.parentNode.clientWidth || 720),
       NW = 13, GAP = 16, PAD = {t:16, b:16, l:8, r:8};
 
-  // Columnas: las etapas van en su índice; las salidas, una columna después de
-  // la última etapa desde la que se cae (así las cintas nunca van hacia atrás).
-  var stageCols = DATA.nodes.filter(function(n){ return n.col !== null; });
-  var maxCol = stageCols.reduce(function(m,n){ return Math.max(m, n.col); }, 0);
-  DATA.nodes.forEach(function(n, i){
-    if(n.col === null){
-      var from = DATA.links.filter(function(l){ return l.target === i; })
-                           .map(function(l){ return DATA.nodes[l.source].col; });
-      n.col = (from.length ? Math.max.apply(null, from) : maxCol) + 1;
-    }
-  });
+  // Columnas: las etapas van en su índice y TODOS los desenlaces (rechazado, sin
+  // respuesta, me retiré, en curso) en una única columna final. Si se colocaran
+  // justo detrás de la etapa de la que caen, acabarían mezclados con una etapa
+  // activa en la misma columna y no se distinguiría el embudo de sus salidas.
+  // Así se lee: izquierda = recorrido, derecha = dónde acabó cada una.
+  var maxCol = DATA.nodes.reduce(function(m,n){
+    return n.col === null ? m : Math.max(m, n.col); }, 0);
+  DATA.nodes.forEach(function(n){ if(n.col === null){ n.col = maxCol + 1; n.exit = true; } });
   var cols = Math.max.apply(null, DATA.nodes.map(function(n){ return n.col; })) + 1;
   var colX = function(c){ return PAD.l + c * ((W - PAD.l - PAD.r - NW) / Math.max(1, cols-1)); };
 
@@ -153,7 +150,11 @@
   H = PAD.t + PAD.b + maxSum*unit + (maxCount-1)*GAP;
 
   Object.keys(byCol).forEach(function(c){
-    var arr = byCol[c].sort(function(a,b){ return b.value - a.value; }), y = PAD.t;
+    // En la columna de desenlaces, «En curso» va al final: no es una pérdida.
+    var arr = byCol[c].sort(function(a,b){
+      var aw = a.id === 'out-waiting' ? 1 : 0, bw = b.id === 'out-waiting' ? 1 : 0;
+      return aw - bw || b.value - a.value;
+    }), y = PAD.t;
     arr.forEach(function(n){ n.h = Math.max(3, n.value*unit); n.x = colX(n.col); n.y = y; y += n.h + GAP; });
   });
 
