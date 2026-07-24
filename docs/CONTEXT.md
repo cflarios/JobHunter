@@ -198,10 +198,17 @@ que expone `complete(parts, json_out=, max_tokens=, web_search=)` y enruta a:
 - **Claude** (`ANTHROPIC_API_KEY`, modelo `claude-opus-4-8`, override con
   `ANTHROPIC_MODEL`). Búsqueda web = herramienta de servidor `web_search_20260209`;
   se maneja `pause_turn` reenviando el turno. Sin `thinking` (más barato/rápido).
-- **Gemini** (`GEMINI_API_KEY`, `gemini-2.5-flash`). **Gotcha crítico:** Gemini 2.5
-  gasta tokens de "thinking" que truncan la salida (`finishReason: MAX_TOKENS`);
-  solución `thinkingConfig.thinkingBudget = 0` + `maxOutputTokens` holgado.
+- **Gemini** (`GEMINI_API_KEY`, **`gemini-3.5-flash`**, override con `GEMINI_MODEL`).
   Grounding = `tools:[{google_search:{}}]`.
+  **Gotcha de generaciones:** Gemini **2.x** gastaba tokens de "thinking" que
+  truncaban la salida (`finishReason: MAX_TOKENS`) y se desactivaban con
+  `thinkingConfig.thinkingBudget = 0`. En la **generación 3 ese campo ya NO es
+  válido**: la API responde **HTTP 400 «invalid argument»**, y además el thinking ya
+  no consume la cuota de salida. Por eso `llm.py` **solo envía `thinkingConfig` si el
+  modelo empieza por `gemini-2`** — así 3.x funciona y volver a 2.5 sigue protegido.
+  **Gotcha de capacidad:** `gemini-3.5-flash` devolvía **503 «high demand»** de forma
+  sostenida en el tier gratuito el 2026-07-24. Es capacidad de Google, no del código;
+  si molesta, `GEMINI_MODEL=gemini-3.5-flash-lite` (verificado OK) sin tocar código.
 
 `llm.py` acepta `parts` estilo Gemini (`{"text"}` / `{"inline_data"}`) y los
 traduce a bloques de Claude (`document`/`image`). Devuelve `(ok, data_or_error)`;

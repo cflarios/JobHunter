@@ -22,7 +22,7 @@ import json
 import requests
 
 # --- Modelos --------------------------------------------------------------- #
-GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash")
 GEMINI_ENDPOINT = ("https://generativelanguage.googleapis.com/v1beta/models/"
                    "{model}:generateContent")
 # Por defecto el modelo Claude más capaz; se puede fijar otro con ANTHROPIC_MODEL.
@@ -84,9 +84,13 @@ def _gemini_complete(parts, json_out, max_tokens, web_search):
     if not key:
         return False, ("Falta GEMINI_API_KEY en el servicio (Google AI Studio). "
                        "Defínela en el .env o cambia el proveedor a Claude.")
-    gen = {"temperature": 0.3, "maxOutputTokens": max_tokens,
-           # Gemini 2.5 gasta tokens de "thinking" que truncan la salida.
-           "thinkingConfig": {"thinkingBudget": 0}}
+    gen = {"temperature": 0.3, "maxOutputTokens": max_tokens}
+    # Gemini 2.x gastaba tokens de "thinking" que truncaban la salida
+    # (finishReason: MAX_TOKENS), y se desactivaba con thinkingBudget=0. En la
+    # generación 3 ese campo YA NO es válido (la API responde 400) y el thinking
+    # no consume la cuota de salida, así que solo se envía para 2.x.
+    if GEMINI_MODEL.startswith("gemini-2"):
+        gen["thinkingConfig"] = {"thinkingBudget": 0}
     if json_out:
         gen["responseMimeType"] = "application/json"
     payload = {"contents": [{"parts": parts}], "generationConfig": gen}

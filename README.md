@@ -101,7 +101,8 @@ desde la web y se guardan **cifradas** (Fernet) en la BD; el `.env` queda como
 fallback. La clave maestra vive en `data/secret.key` (600, fuera del repo).
 
 **Proveedor de IA** — por defecto **Claude** (`claude-opus-4-8`); **Gemini**
-(`gemini-2.5-flash`) como alternativa gratis.
+(`gemini-3.5-flash`) como alternativa gratis. Ambos modelos se pueden fijar por
+entorno: `ANTHROPIC_MODEL` y `GEMINI_MODEL`.
 
 **Notificaciones** — avisos de empleos nuevos por **email (SMTP)** y/o
 **Telegram**, en modo **inmediato** y/o **resumen diario** a una hora fija. Para

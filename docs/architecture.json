@@ -224,7 +224,7 @@
         },
         {
           "name": "Gemini (Google)",
-          "detail": "gemini-2.5-flash; grounding tools:[{google_search}]; thinkingBudget=0 + maxOutputTokens holgado para no truncar"
+          "detail": "gemini-3.5-flash (override GEMINI_MODEL); grounding tools:[{google_search}]. thinkingConfig.thinkingBudget solo se envía en modelos gemini-2.x: en la generación 3 ese campo da HTTP 400 y el thinking ya no trunca la salida"
         },
         {
           "name": "reviews.py",
