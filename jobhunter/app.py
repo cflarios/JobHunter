@@ -156,6 +156,24 @@ def mark_seen():
     return redirect(request.referrer or url_for("index"))
 
 
+@app.route("/jobs/<int:job_id>/seen", methods=["POST"])
+def job_toggle_seen(job_id):
+    """Alterna el estado nuevo/visto de UN empleo (como un correo leído/no leído)."""
+    want = request.form.get("new")               # "1" nueva, "0" vista; ausente = alternar
+    con = get_db()
+    row = con.execute("SELECT is_new FROM jobs WHERE id=?", (job_id,)).fetchone()
+    if not row:
+        con.close()
+        return jsonify(ok=False, error="Empleo no encontrado"), 404
+    new_val = (1 if want == "1" else 0) if want in ("0", "1") else (0 if row["is_new"] else 1)
+    con.execute("UPDATE jobs SET is_new=? WHERE id=?", (new_val, job_id))
+    con.commit()
+    con.close()
+    if request.headers.get("X-Requested-With") == "fetch":
+        return jsonify(ok=True, is_new=bool(new_val))
+    return redirect(request.referrer or url_for("index"))
+
+
 @app.route("/notifications")
 def notifications():
     con = get_db()

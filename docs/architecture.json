@@ -15,7 +15,7 @@
   "metrics": {
     "sources": 12,
     "db_tables": 11,
-    "http_routes": 39,
+    "http_routes": 40,
     "python_lines": 4468,
     "template_files": 13,
     "systemd_units": 3,
@@ -396,6 +396,11 @@
       "path": "/mark-seen",
       "method": "POST",
       "purpose": "Marca todos los empleos como vistos"
+    },
+    {
+      "path": "/jobs/<id>/seen",
+      "method": "POST",
+      "purpose": "Alterna nuevo/visto de un empleo (AJAX)"
     },
     {
       "path": "/searches",

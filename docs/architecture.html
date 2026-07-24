@@ -180,7 +180,7 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
     <div class="chips">
       <div class="chip"><div class="n">12</div><div class="l">Fuentes</div></div>
       <div class="chip"><div class="n">11</div><div class="l">Tablas SQLite</div></div>
-      <div class="chip"><div class="n">39</div><div class="l">Rutas HTTP</div></div>
+      <div class="chip"><div class="n">40</div><div class="l">Rutas HTTP</div></div>
       <div class="chip"><div class="n">2</div><div class="l">Canales de aviso</div></div>
       <div class="chip"><div class="n">~4.5k</div><div class="l">Líneas de código</div></div>
       <div class="chip"><div class="n">6</div><div class="l">Funciones IA</div></div>
@@ -389,6 +389,7 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
       <tbody>
         <tr><td class="path">/</td><td class="method">GET</td><td>Empleos: lista + filtros (texto, fuente, búsqueda, días)</td></tr>
         <tr><td class="path">/mark-seen</td><td class="method">POST</td><td>Marca todos los empleos como vistos</td></tr>
+        <tr><td class="path">/jobs/&lt;id&gt;/seen</td><td class="method">POST</td><td>Alterna nuevo/visto de un empleo (AJAX)</td></tr>
         <tr><td class="path">/notifications</td><td class="method">GET</td><td>Historial (marca leídas)</td></tr>
         <tr><td class="path">/notifications/clear</td><td class="method">POST</td><td>Borra notificaciones</td></tr>
         <tr><td class="path">/searches</td><td class="method">GET·POST</td><td>Búsquedas: alta, keywords de título, modo ubicación, ventana, RapidAPI</td></tr>
@@ -515,7 +516,7 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
   "metrics": {
     "sources": 12,
     "db_tables": 11,
-    "http_routes": 39,
+    "http_routes": 40,
     "python_lines": 4468,
     "template_files": 13,
     "systemd_units": 3,
@@ -896,6 +897,11 @@ details.json pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mo
       "path": "/mark-seen",
       "method": "POST",
       "purpose": "Marca todos los empleos como vistos"
+    },
+    {
+      "path": "/jobs/<id>/seen",
+      "method": "POST",
+      "purpose": "Alterna nuevo/visto de un empleo (AJAX)"
     },
     {
       "path": "/searches",

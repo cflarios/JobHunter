@@ -564,6 +564,18 @@ sudo systemctl restart jobhunter-web.service       # tras cambios en app/templat
   vertical). La **documentación** (Arquitectura, Workflow, Repositorio) es una
   **fila compacta de iconos** con tooltip, sin etiqueta ni filas completas. Al
   contraer el panel, la subsección pierde la guía y la fila de docs se apila.
+- **Zona de acciones de cada empleo (index.html).** Todos los controles (Ver
+  oferta, seguimiento, ¿encajo?, carta, CV a medida) comparten **ancho (172px) y
+  alto (34px)** vía `.job-actions`: antes convivían un `<a>`, un `<select>` y tres
+  `<button>` con paddings propios y el borde izquierdo quedaba dentado. Jerarquía:
+  **verde** = acción principal (Ver oferta), selector = seguimiento, y las tres
+  herramientas de IA agrupadas bajo una etiqueta «Asistente IA» con separador. En
+  móvil la columna se vuelve una fila que envuelve.
+- **Indicador nuevo/visto clicable.** El badge NUEVO pasó a ser un botón
+  (`.new-toggle`, un punto + etiqueta) que **alterna `jobs.is_new` por empleo** vía
+  `POST /jobs/<id>/seen` (AJAX, como marcar un correo leído/no leído). El borde
+  verde de la tarjeta (`.job-card.is-new`) se actualiza al vuelo. Sigue existiendo
+  «Marcar todo como visto» (`/mark-seen`) para el lote.
 - **El usuario edita la config en vivo desde la web** (ventana, keywords, modo).
   **No pisar sus ajustes** sin preguntar (ver memoria `jobhunter-live-settings`).
 - **RapidAPI: cuotas y propagación.** El plan gratuito/BASIC tiene cuota mensual

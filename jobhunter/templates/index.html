@@ -2,6 +2,47 @@
 {% block title %}Empleos · JobHunter{% endblock %}
 {% block body %}
 
+<style>
+/* Zona de acciones: todos los controles al mismo ancho y alto. Antes convivían
+   un <a>, un <select> y tres <button> con paddings distintos, así que el borde
+   izquierdo quedaba irregular y las alturas no casaban. */
+.job-actions{display:flex;flex-direction:column;gap:6px;width:172px;flex:0 0 auto}
+.job-actions > *{width:100%;margin:0}
+.job-actions .btn,
+.job-actions select{
+  height:34px;box-sizing:border-box;border-radius:8px;font-size:12.5px;
+  font-family:inherit;font-weight:600;padding:0 12px;
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.job-actions select{font-weight:500;text-align:left;padding:0 8px}
+.job-actions .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--mut)}
+.job-actions .btn.ghost:hover{border-color:var(--accent);color:var(--accent)}
+.job-actions .btn[disabled]{opacity:.6}
+/* Separador entre la acción principal/seguimiento y las herramientas de IA */
+.ja-sep{height:1px;background:var(--line);margin:3px 0 1px}
+.ja-lbl{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut);
+  opacity:.65;text-align:center;font-weight:700}
+/* Indicador nuevo/visto: se puede volver a marcar como nueva (como un no leído) */
+.new-toggle{display:inline-flex;align-items:center;gap:5px;cursor:pointer;
+  background:transparent;border:1px solid transparent;border-radius:20px;
+  padding:1px 8px 1px 6px;font-family:inherit;font-size:11px;font-weight:700;
+  color:var(--mut);vertical-align:2px;transition:border-color .14s,color .14s}
+.new-toggle .dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto;
+  border:1.5px solid var(--mut);box-sizing:border-box}
+.new-toggle .lbl{display:none}
+.new-toggle:hover{border-color:var(--line);color:var(--txt)}
+.new-toggle.is-new{color:var(--accent2);border-color:transparent}
+.new-toggle.is-new .dot{background:var(--accent2);border-color:var(--accent2)}
+.new-toggle.is-new .lbl{display:inline}
+.job-card.is-new{border-color:var(--accent2)}
+@media(max-width:700px){
+  .job-card > .row{flex-direction:column}
+  .job-actions{width:100%;flex-direction:row;flex-wrap:wrap}
+  .job-actions > *{width:auto;flex:1 1 140px}
+  .ja-sep,.ja-lbl{display:none}
+}
+</style>
+
 <a id="new-banner" href="javascript:location.reload()"
    style="display:none;text-decoration:none;margin-bottom:16px;padding:12px 16px;
    background:#13351f;border:1px solid var(--accent2);border-radius:10px;
@@ -73,12 +114,16 @@
 
 <div id="jobs-list">
 {% for j in jobs %}
-<div class="card job-card" style="{{ 'border-color:var(--accent2)' if j.is_new }}">
+<div class="card job-card {{ 'is-new' if j.is_new }}">
   <div class="row" style="justify-content:space-between;align-items:flex-start">
     <div style="flex:1;min-width:60%">
       <div style="font-size:17px;font-weight:600">
         <a href="{{ j.url }}" target="_blank" rel="noopener">{{ j.title }}</a>
-        {% if j.is_new %}<span class="badge">NUEVO</span>{% endif %}
+        <button type="button" class="new-toggle {{ 'is-new' if j.is_new }}" data-id="{{ j.id }}"
+                title="{{ 'Marcar como vista' if j.is_new else 'Marcar como nueva' }}"
+                aria-pressed="{{ 'true' if j.is_new else 'false' }}">
+          <span class="dot"></span><span class="lbl">NUEVO</span>
+        </button>
       </div>
       <div class="muted" style="margin:2px 0 8px">
         {{ j.company or 'Empresa no indicada' }} · {{ j.location or 'Remote' }}
@@ -109,20 +154,22 @@
       </details>
       {% endif %}
     </div>
-    <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;min-width:120px">
-      <a class="btn sm" href="{{ j.url }}" target="_blank" rel="noopener">Ver oferta →</a>
+    <div class="job-actions">
+      <a class="btn green" href="{{ j.url }}" target="_blank" rel="noopener">Ver oferta →</a>
       <select class="track-sel" data-id="{{ j.id }}" title="Estado de tu postulación"
-              style="padding:5px 8px;font-size:12px;max-width:150px;{{ 'color:%s;border-color:%s'|format(j.track_meta.color, j.track_meta.color) if j.track_meta }}">
+              style="{{ 'color:%s;border-color:%s'|format(j.track_meta.color, j.track_meta.color) if j.track_meta }}">
         <option value="__none__" {{ 'selected' if not j.track }}>Sin seguimiento</option>
         {% for s in stages %}<option value="{{ s.key }}" {{ 'selected' if j.track==s.key }}>{{ s.icon }} {{ s.label }}</option>{% endfor %}
         <option disabled>──────</option>
         {% for o in outcomes %}<option value="{{ o.key }}" {{ 'selected' if j.track==o.key }}>{{ o.icon }} {{ o.label }}</option>{% endfor %}
       </select>
       {% if has_profile %}
-      <button class="btn sm ghost fit-btn" data-id="{{ j.id }}">¿Encajo aquí?</button>
-      <button class="btn sm ghost cover-btn" data-id="{{ j.id }}">✉ Carta</button>
+      <div class="ja-sep"></div>
+      <div class="ja-lbl">Asistente IA</div>
+      <button class="btn ghost fit-btn" data-id="{{ j.id }}">¿Encajo aquí?</button>
+      <button class="btn ghost cover-btn" data-id="{{ j.id }}">✉ Carta</button>
       {% if cv_langs %}
-      <button class="btn sm tailor-btn" data-id="{{ j.id }}"
+      <button class="btn ghost tailor-btn" data-id="{{ j.id }}"
               title="Adapta tu CV generado a esta vacante para maximizar el paso por el ATS">🎯 CV a medida</button>
       {% endif %}
       {% endif %}
@@ -247,6 +294,23 @@
             }
           }).catch(function(){ unspin(go); });
       });
+    });
+  });
+  // --- Nuevo/visto por empleo (como marcar un correo leído / no leído) ---
+  document.querySelectorAll('.new-toggle').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      var card=btn.closest('.job-card'), makeNew = !btn.classList.contains('is-new');
+      var fd=new FormData(); fd.append('new', makeNew ? '1' : '0');
+      btn.disabled=true;
+      fetch('/jobs/'+btn.dataset.id+'/seen',{method:'POST',headers:{'X-Requested-With':'fetch'},body:fd})
+        .then(function(r){return r.json();}).then(function(d){
+          btn.disabled=false;
+          if(!d.ok) return;
+          btn.classList.toggle('is-new', d.is_new);
+          card.classList.toggle('is-new', d.is_new);
+          btn.setAttribute('aria-pressed', d.is_new ? 'true' : 'false');
+          btn.title = d.is_new ? 'Marcar como vista' : 'Marcar como nueva';
+        }).catch(function(){ btn.disabled=false; });
     });
   });
   // --- Seguimiento de postulación: guarda al vuelo, sin recargar ---
