@@ -185,7 +185,7 @@
       "components": [
         {
           "name": "Empleos",
-          "detail": "lista + filtros + % de afinidad + barra de 'empleos nuevos' (sondeo 45s) + botón «CV a medida» por vacante"
+          "detail": "lista + filtros + % de afinidad + barra de 'empleos nuevos' (sondeo 45s) + botón «CV a medida» + filtro flotante de skills (chips DevOps + entrada manual, en cliente) + estado nuevo/visto por empleo"
         },
         {
           "name": "Compañías",

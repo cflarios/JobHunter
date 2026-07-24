@@ -79,6 +79,17 @@ _SKILLS = [
 ]
 
 
+# Selección curada para el filtro rápido de la página Empleos (chips de un clic).
+# Es un subconjunto de _SKILLS ordenado por relevancia para DevOps/SRE; el usuario
+# puede además escribir cualquier otra skill a mano.
+QUICK_DEVOPS = [
+    "Kubernetes", "Docker", "Terraform", "AWS", "Azure", "GCP", "Ansible", "Helm",
+    "CI/CD", "Jenkins", "GitHub Actions", "GitLab CI", "ArgoCD", "Prometheus",
+    "Grafana", "Datadog", "Linux", "Bash", "Python", "Go", "Kafka", "PostgreSQL",
+    "Redis", "Nginx",
+]
+
+
 def _compile(alias):
     # Delimitado por algo que no sea alfanumérico (los símbolos +, #, ., / del propio
     # alias van escapados y forman parte del match).

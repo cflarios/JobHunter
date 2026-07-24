@@ -564,6 +564,20 @@ sudo systemctl restart jobhunter-web.service       # tras cambios en app/templat
   vertical). La **documentación** (Arquitectura, Workflow, Repositorio) es una
   **fila compacta de iconos** con tooltip, sin etiqueta ni filas completas. Al
   contraer el panel, la subsección pierde la guía y la fila de docs se apila.
+- **Filtro flotante de skills (Empleos).** Panel translúcido (`#skfx`, blur) que se
+  abre con un botón fijo «⚗ Skills» y filtra **en cliente** las tarjetas ya
+  cargadas por sus skills (`data-skills` en cada `.job-card`, canónicas en
+  minúsculas). Chips de un clic con una lista **DevOps curada**
+  (`skills.QUICK_DEVOPS`, 24) que muestran cuántos empleos tienen cada una, más un
+  campo para **escribir cualquier skill** a mano. Modo **Cualquiera/Todas** (OR/AND).
+  El match es por **substring** (así «kube» encuentra Kubernetes; a cambio, términos
+  muy cortos pueden colar algún falso positivo). Estado (skills + modo) **persistido
+  en localStorage**. El **paginador de Empleos se reescribió** para combinar filtro y
+  paginación: pagina solo sobre las coincidencias y actualiza el contador; ya **no
+  usa `jhPaginate`** (las demás páginas lo siguen usando).
+- **Gotcha Jinja:** en el CSS del panel, `@media(...){#skfx-launch{…}}` disparaba
+  «Missing end of comment tag» porque Jinja lee `{#` como inicio de comentario. Se
+  evita con un espacio: `{ #skfx-launch`.
 - **Zona de acciones de cada empleo (index.html).** Todos los controles (Ver
   oferta, seguimiento, ¿encajo?, carta, CV a medida) comparten **ancho (172px) y
   alto (34px)** vía `.job-actions`: antes convivían un `<a>`, un `<select>` y tres

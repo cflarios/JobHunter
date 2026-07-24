@@ -35,6 +35,52 @@
 .new-toggle.is-new .dot{background:var(--accent2);border-color:var(--accent2)}
 .new-toggle.is-new .lbl{display:inline}
 .job-card.is-new{border-color:var(--accent2)}
+
+/* ---- Filtro flotante de skills ---- */
+#skfx-launch{position:fixed;right:18px;bottom:20px;z-index:45;display:inline-flex;
+  align-items:center;gap:8px;background:var(--accent);color:#fff;border:none;
+  border-radius:24px;padding:11px 16px;font:600 13px/1 inherit;cursor:pointer;
+  box-shadow:0 10px 26px -10px rgba(0,0,0,.6)}
+#skfx-launch:hover{filter:brightness(1.08)}
+#skfx-launch .cnt{background:#fff;color:var(--accent);border-radius:12px;
+  min-width:19px;height:19px;display:inline-flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:800;padding:0 5px}
+#skfx-launch .cnt:empty{display:none}
+#skfx{position:fixed;top:0;right:0;bottom:0;width:300px;max-width:88vw;z-index:60;
+  background:color-mix(in srgb, var(--card) 82%, transparent);
+  backdrop-filter:blur(14px) saturate(1.2);-webkit-backdrop-filter:blur(14px) saturate(1.2);
+  border-left:1px solid var(--line);box-shadow:-24px 0 60px -30px rgba(0,0,0,.7);
+  transform:translateX(100%);transition:transform .22s ease;display:flex;flex-direction:column}
+#skfx.open{transform:none}
+#skfx .skfx-head{display:flex;align-items:center;gap:8px;padding:16px 16px 10px}
+#skfx .skfx-head h3{margin:0;font-size:15px}
+#skfx-close{margin-left:auto;background:transparent;border:1px solid var(--line);color:var(--mut);
+  width:28px;height:28px;border-radius:8px;cursor:pointer;font-size:15px}
+#skfx-close:hover{color:var(--txt);border-color:var(--accent)}
+#skfx .skfx-body{padding:0 16px 16px;overflow-y:auto;flex:1}
+.skfx-mode{display:flex;gap:4px;background:var(--card2);border-radius:8px;padding:3px;margin-bottom:12px}
+.skfx-mode button{flex:1;background:transparent;border:none;color:var(--mut);border-radius:6px;
+  padding:6px;font:600 12px inherit;cursor:pointer}
+.skfx-mode button.on{background:var(--accent);color:#fff}
+.skfx-add{display:flex;gap:6px;margin-bottom:12px}
+.skfx-add input{flex:1;min-width:0}
+.skfx-lbl{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut);
+  opacity:.7;font-weight:700;margin:10px 0 7px}
+.skfx-chips{display:flex;flex-wrap:wrap;gap:6px}
+.skchip{background:var(--pill);color:var(--mut);border:1px solid transparent;border-radius:16px;
+  padding:4px 10px;font-size:12.5px;cursor:pointer;font-family:inherit;
+  display:inline-flex;align-items:center;gap:5px;transition:all .12s}
+.skchip:hover{border-color:var(--accent);color:var(--txt)}
+.skchip.on{background:rgba(79,140,255,.16);color:var(--accent);border-color:var(--accent);font-weight:600}
+.skchip .c{font-size:10.5px;opacity:.7}
+.skchip.custom.on{background:rgba(34,197,94,.16);color:var(--accent2);border-color:var(--accent2)}
+.skfx-empty{color:var(--mut);font-size:12.5px;font-style:italic}
+.skfx-foot{border-top:1px solid var(--line);padding:12px 16px;display:flex;
+  align-items:center;justify-content:space-between;gap:10px;font-size:13px}
+#skfx-overlay{position:fixed;inset:0;background:rgba(6,10,18,.35);z-index:55;display:none}
+#skfx-overlay.open{display:block}
+@media(max-width:700px){ #skfx-launch{right:12px;bottom:14px} }
+
 @media(max-width:700px){
   .job-card > .row{flex-direction:column}
   .job-actions{width:100%;flex-direction:row;flex-wrap:wrap}
@@ -110,11 +156,46 @@
   {% endif %}
 </div>
 
-<p class="muted">{{ jobs|length }} empleo(s) mostrados.</p>
+<p class="muted"><span id="jobs-count">{{ jobs|length }}</span> empleo(s) mostrados<span id="jobs-filtered"></span>.</p>
+
+<button id="skfx-launch" type="button" aria-controls="skfx" aria-expanded="false"
+        title="Filtrar por skills">⚗ Skills<span class="cnt" id="skfx-cnt"></span></button>
+<div id="skfx-overlay"></div>
+<aside id="skfx" aria-label="Filtro por skills">
+  <div class="skfx-head">
+    <h3>Filtrar por skills</h3>
+    <button id="skfx-close" type="button" aria-label="Cerrar">✕</button>
+  </div>
+  <div class="skfx-body">
+    <p class="muted" style="font-size:12px;margin:0 0 12px">Muestra solo los empleos que incluyen las skills que te interesan. Filtra sobre lo que ya está en pantalla, sin recargar.</p>
+    <div class="skfx-mode" role="tablist">
+      <button type="button" data-mode="any" class="on">Cualquiera</button>
+      <button type="button" data-mode="all">Todas</button>
+    </div>
+    <form class="skfx-add" id="skfx-add">
+      <input type="text" id="skfx-input" placeholder="Escribe una skill y Enter…" autocomplete="off" spellcheck="false">
+      <button class="btn sm" type="submit">Añadir</button>
+    </form>
+    <div id="skfx-active-wrap" style="display:none">
+      <div class="skfx-lbl">Activas</div>
+      <div class="skfx-chips" id="skfx-active"></div>
+    </div>
+    <div class="skfx-lbl">DevOps · un clic</div>
+    <div class="skfx-chips" id="skfx-quick">
+      {% for s in quick_skills %}
+      <button type="button" class="skchip" data-skill="{{ s|lower }}">{{ s }}<span class="c"></span></button>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="skfx-foot">
+    <span class="muted"><b id="skfx-match">{{ jobs|length }}</b> coinciden</span>
+    <button class="btn sm ghost" type="button" id="skfx-clear">Limpiar</button>
+  </div>
+</aside>
 
 <div id="jobs-list">
 {% for j in jobs %}
-<div class="card job-card {{ 'is-new' if j.is_new }}">
+<div class="card job-card {{ 'is-new' if j.is_new }}" data-skills="{{ (j.skill_list|join(','))|lower }}">
   <div class="row" style="justify-content:space-between;align-items:flex-start">
     <div style="flex:1;min-width:60%">
       <div style="font-size:17px;font-weight:600">
@@ -335,9 +416,144 @@
       if(b){ b.disabled=true; b.innerHTML='<span class="spinner"></span>Calculando…'; }
     });
   });
-  // Paginación: 10 empleos por página
-  jhPaginate(document.getElementById('jobs-list'), '.job-card', 10,
-             document.getElementById('jobs-pager'));
+})();
+
+// --- Filtro por skills (flotante) + paginación combinada ---
+(function(){
+  var listEl = document.getElementById('jobs-list');
+  var pagerEl = document.getElementById('jobs-pager');
+  if(!listEl || !pagerEl) return;
+  var cards = Array.prototype.slice.call(listEl.querySelectorAll('.job-card'));
+  var SIZE = 10, cur = 1;
+  var active = new Set(), mode = 'any';
+  var KEY = 'jhSkillFilter';
+
+  try{
+    var saved = JSON.parse(localStorage.getItem(KEY) || '{}');
+    (saved.skills || []).forEach(function(s){ active.add(s); });
+    if(saved.mode === 'all' || saved.mode === 'any') mode = saved.mode;
+  }catch(e){}
+
+  function save(){
+    try{ localStorage.setItem(KEY, JSON.stringify({skills: Array.from(active), mode: mode})); }catch(e){}
+  }
+  function isCustom(s){ return quickSet.indexOf(s) < 0; }
+  function matches(card){
+    if(active.size === 0) return true;
+    var hay = card.getAttribute('data-skills') || '';
+    var arr = Array.from(active);
+    return mode === 'all'
+      ? arr.every(function(s){ return hay.indexOf(s) >= 0; })
+      : arr.some(function(s){ return hay.indexOf(s) >= 0; });
+  }
+
+  // Cuántos empleos (de todos los cargados) tienen cada skill del quick-pick
+  var quickBtns = Array.prototype.slice.call(document.querySelectorAll('#skfx-quick .skchip'));
+  var quickSet = quickBtns.map(function(b){ return b.dataset.skill; });
+  quickBtns.forEach(function(b){
+    var n = cards.filter(function(c){ return (c.getAttribute('data-skills')||'').indexOf(b.dataset.skill) >= 0; }).length;
+    b.querySelector('.c').textContent = n ? n : '';
+    b.classList.toggle('on', active.has(b.dataset.skill));
+    if(!n) b.style.opacity = '.5';
+  });
+
+  var pgBtn = function(label, page, o){
+    o = o || {}; var b = document.createElement('button');
+    b.className = 'pgbtn' + (o.active ? ' active' : ''); b.textContent = label;
+    if(o.disabled || o.active) b.disabled = true;
+    else b.addEventListener('click', function(){ cur = page; render();
+      listEl.scrollIntoView({behavior:'smooth', block:'start'}); });
+    return b;
+  };
+  function pager(pages){
+    pagerEl.innerHTML = '';
+    if(pages <= 1){ return; }
+    pagerEl.appendChild(pgBtn('‹', cur-1, {disabled: cur===1}));
+    var start = Math.max(1, cur-2), end = Math.min(pages, start+4); start = Math.max(1, end-4);
+    if(start > 1){ pagerEl.appendChild(pgBtn('1', 1, {}));
+      if(start > 2){ var d=document.createElement('span'); d.className='pgdots'; d.textContent='…'; pagerEl.appendChild(d); } }
+    for(var p=start; p<=end; p++) pagerEl.appendChild(pgBtn(String(p), p, {active: p===cur}));
+    if(end < pages){ if(end < pages-1){ var d2=document.createElement('span'); d2.className='pgdots'; d2.textContent='…'; pagerEl.appendChild(d2); }
+      pagerEl.appendChild(pgBtn(String(pages), pages, {})); }
+    pagerEl.appendChild(pgBtn('›', cur+1, {disabled: cur===pages}));
+  }
+
+  var countEl = document.getElementById('jobs-count'),
+      filtEl = document.getElementById('jobs-filtered'),
+      matchEl = document.getElementById('skfx-match'),
+      cntEl = document.getElementById('skfx-cnt');
+  function render(){
+    var matched = cards.filter(matches);
+    var pages = Math.max(1, Math.ceil(matched.length / SIZE));
+    if(cur > pages) cur = 1;
+    cards.forEach(function(c){ c.style.display = 'none'; });
+    matched.forEach(function(c, i){
+      c.style.display = (i >= (cur-1)*SIZE && i < cur*SIZE) ? '' : 'none';
+    });
+    pager(pages);
+    if(countEl) countEl.textContent = matched.length;
+    if(filtEl)  filtEl.textContent = active.size ? (' · ' + active.size + ' skill' + (active.size>1?'s':'') + ' activa' + (active.size>1?'s':'')) : '';
+    if(matchEl) matchEl.textContent = matched.length;
+    if(cntEl)   cntEl.textContent = active.size ? active.size : '';
+    renderActive();
+  }
+
+  function renderActive(){
+    var wrap = document.getElementById('skfx-active-wrap'),
+        box = document.getElementById('skfx-active');
+    box.innerHTML = '';
+    wrap.style.display = active.size ? '' : 'none';
+    Array.from(active).forEach(function(s){
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'skchip on' + (isCustom(s) ? ' custom' : '');
+      b.innerHTML = s + ' ✕';
+      b.addEventListener('click', function(){ toggle(s); });
+      box.appendChild(b);
+    });
+    quickBtns.forEach(function(b){ b.classList.toggle('on', active.has(b.dataset.skill)); });
+  }
+
+  function toggle(skill){
+    skill = skill.trim().toLowerCase();
+    if(!skill) return;
+    if(active.has(skill)) active.delete(skill); else active.add(skill);
+    cur = 1; save(); render();
+  }
+
+  quickBtns.forEach(function(b){ b.addEventListener('click', function(){ toggle(b.dataset.skill); }); });
+  document.querySelectorAll('.skfx-mode button').forEach(function(b){
+    b.classList.toggle('on', b.dataset.mode === mode);
+    b.addEventListener('click', function(){
+      mode = b.dataset.mode;
+      document.querySelectorAll('.skfx-mode button').forEach(function(x){ x.classList.toggle('on', x===b); });
+      cur = 1; save(); render();
+    });
+  });
+  document.getElementById('skfx-add').addEventListener('submit', function(e){
+    e.preventDefault();
+    var inp = document.getElementById('skfx-input');
+    toggle(inp.value); inp.value = '';
+  });
+  document.getElementById('skfx-clear').addEventListener('click', function(){
+    active.clear(); cur = 1; save(); render();
+  });
+
+  // Abrir/cerrar el panel flotante
+  var panel = document.getElementById('skfx'),
+      overlay = document.getElementById('skfx-overlay'),
+      launch = document.getElementById('skfx-launch');
+  function setOpen(o){
+    panel.classList.toggle('open', o);
+    overlay.classList.toggle('open', o);
+    launch.setAttribute('aria-expanded', o ? 'true' : 'false');
+  }
+  launch.addEventListener('click', function(){ setOpen(!panel.classList.contains('open')); });
+  document.getElementById('skfx-close').addEventListener('click', function(){ setOpen(false); });
+  overlay.addEventListener('click', function(){ setOpen(false); });
+  document.addEventListener('keydown', function(e){ if(e.key === 'Escape') setOpen(false); });
+
+  render();
 })();
 </script>
 {% endblock %}

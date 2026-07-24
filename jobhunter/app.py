@@ -144,7 +144,8 @@ def index():
                            f_q=q, f_source=source, f_search=active_search,
                            f_days=days, f_sort=sort, has_profile=has_profile,
                            n_matches=n_matches, cv_langs=cv_langs,
-                           stages=tracker.STAGES, outcomes=tracker.OUTCOMES)
+                           stages=tracker.STAGES, outcomes=tracker.OUTCOMES,
+                           quick_skills=skl.QUICK_DEVOPS)
 
 
 @app.route("/mark-seen", methods=["POST"])
